@@ -1,0 +1,19 @@
+plugins {
+    id 'java'
+}
+
+group = 'dev.prodzeus'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+    maven { url = uri('https://jitpack.io') }
+}
+
+dependencies {
+    annotationProcessor 'org.junit.jupiter:junit-jupiter'
+}
+
+test {
+    useJUnitPlatform()
+}
