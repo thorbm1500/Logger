@@ -7,7 +7,7 @@ import org.slf4j.spi.SLF4JServiceProvider;
 
 public class SLF4JProvider implements SLF4JServiceProvider {
 
-    private final ILoggerFactory loggerFactory = new LoggerFactory();
+    private final ILoggerFactory loggerFactory = new ZLoggerFactory();
     private final IMarkerFactory markerFactory = new MarkerFactory();
 
     @Override

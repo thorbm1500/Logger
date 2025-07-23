@@ -2,6 +2,7 @@ package dev.prodzeus.logger;
 
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
 import org.slf4j.Marker;
 
 import java.util.HashSet;
@@ -14,7 +15,8 @@ import java.util.regex.Matcher;
  * @apiNote SLF4J Version: <b>2.0.12</b>
  * @author prodzeus
  */
-public class Logger implements org.slf4j.Logger {
+@SuppressWarnings("unused")
+public class ZLogger implements Logger {
 
     private final String name;
     private Level level = Level.INFO;
@@ -26,9 +28,9 @@ public class Logger implements org.slf4j.Logger {
      * Constructs a new Logger instance.
      * @param name Name of the new Logger instance.
      * @apiNote <b>This should only be called through the LoggerFactory!</b>
-     * @see LoggerFactory#getLogger(String)
+     * @see ZLoggerFactory#getLogger(String)
      */
-    public Logger(final String name) {
+    public ZLogger(final String name) {
         this.name = name;
     }
 
@@ -38,7 +40,7 @@ public class Logger implements org.slf4j.Logger {
      * @apiNote A log with a forced marker will <b>always</b> be logged, regardless of the current {@link Level}.
      * @return The Logger instance.
      */
-    public Logger registerForcedMarker(@NotNull final Marker marker) {
+    public ZLogger registerForcedMarker(@NotNull final Marker marker) {
         this.forcedMarkers.add(marker);
         return this;
     }
@@ -48,7 +50,7 @@ public class Logger implements org.slf4j.Logger {
      * @param marker Marker to unregister.
      * @return The Logger instance.
      */
-    public Logger unregisterForcedMarker(@NotNull final Marker marker) {
+    public ZLogger unregisterForcedMarker(@NotNull final Marker marker) {
         this.forcedMarkers.remove(marker);
         return this;
     }
@@ -57,7 +59,7 @@ public class Logger implements org.slf4j.Logger {
      * Clear all registered forced {@link Marker}s.
      * @return The Logger instance.
      */
-    public Logger clearForcedMarkers() {
+    public ZLogger clearForcedMarkers() {
         this.forcedMarkers.clear();
         return this;
     }
@@ -67,7 +69,7 @@ public class Logger implements org.slf4j.Logger {
      * @param level New Log Level.
      * @return The Logger instance.
      */
-    public Logger setLevel(@NotNull final Level level) {
+    public ZLogger setLevel(@NotNull final Level level) {
         this.level = level;
         return this;
     }
@@ -77,7 +79,7 @@ public class Logger implements org.slf4j.Logger {
      * Any logs logged below this level will be ignored,
      * unless a forced marker has been registered.
      * @return The current Level.
-     * @see Logger#registerForcedMarker(Marker) 
+     * @see ZLogger#registerForcedMarker(Marker)
      */
     @NotNull
     @Contract(pure = true)
@@ -101,7 +103,7 @@ public class Logger implements org.slf4j.Logger {
      * @param level The level.
      * @return True, if the level is equal to or higher than the current Log Level,
      * or if the marker is a registered forced marker, otherwise false.
-     * @see Logger#registerForcedMarker(Marker) 
+     * @see ZLogger#registerForcedMarker(Marker)
      */
     @Contract(pure = true)
     public boolean isLoggable(@NotNull final Marker marker, final Level level) {
@@ -131,7 +133,7 @@ public class Logger implements org.slf4j.Logger {
      * @param enable True | False
      * @return The Logger instance.
      */
-    public Logger alwaysRunConsumers(final boolean enable) {
+    public ZLogger alwaysRunConsumers(final boolean enable) {
         this.alwaysRunConsumers = enable;
         return this;
     }
@@ -143,7 +145,7 @@ public class Logger implements org.slf4j.Logger {
      * @return The Logger instance.
      *
      */
-    public Logger registerConsumer(@NotNull final Consumer<String> consumer) {
+    public ZLogger registerConsumer(@NotNull final Consumer<String> consumer) {
         this.consumer.add(consumer);
         return this;
     }
@@ -153,7 +155,7 @@ public class Logger implements org.slf4j.Logger {
      * @param consumer Consumer to unregister.
      * @return The Logger instance.
      */
-    public Logger unregisterConsumer(@NotNull final Consumer<String> consumer) {
+    public ZLogger unregisterConsumer(@NotNull final Consumer<String> consumer) {
         this.consumer.remove(consumer);
         return this;
     }
@@ -162,7 +164,7 @@ public class Logger implements org.slf4j.Logger {
      * Clear all registered Consumers.
      * @return The Logger instance.
      */
-    public Logger clearConsumers() {
+    public ZLogger clearConsumers() {
         this.consumer.clear();
         return this;
     }
@@ -213,7 +215,7 @@ public class Logger implements org.slf4j.Logger {
     /**
      * Check if log calls to Log Level {@link Level#TRACE} with the given {@link Marker} will be logged or ignored.
      * @return True, if the current Log Level is of Level Trace, or if the Marker is a registered forced marker.
-     * @see Logger#registerForcedMarker(Marker)
+     * @see ZLogger#registerForcedMarker(Marker)
      */
     @Override
     public boolean isTraceEnabled(@NotNull final Marker marker) {
@@ -282,7 +284,7 @@ public class Logger implements org.slf4j.Logger {
     /**
      * Check if log calls to Log Level {@link Level#DEBUG} with the given {@link Marker} will be logged or ignored.
      * @return True, if the current Log Level is of Level Debug, or if the Marker is a registered forced marker.
-     * @see Logger#registerForcedMarker(Marker)
+     * @see ZLogger#registerForcedMarker(Marker)
      */
     @Override
     public boolean isDebugEnabled(@NotNull final Marker marker) {
@@ -351,7 +353,7 @@ public class Logger implements org.slf4j.Logger {
     /**
      * Check if log calls to Log Level {@link Level#INFO} with the given {@link Marker} will be logged or ignored.
      * @return True, if the current Log Level is of Level Info, or if the Marker is a registered forced marker.
-     * @see Logger#registerForcedMarker(Marker)
+     * @see ZLogger#registerForcedMarker(Marker)
      */
     @Override
     public boolean isInfoEnabled(@NotNull final Marker marker) {
@@ -420,7 +422,7 @@ public class Logger implements org.slf4j.Logger {
     /**
      * Check if log calls to Log Level {@link Level#WARNING} with the given {@link Marker} will be logged or ignored.
      * @return True, if the current Log Level is of Level Warning, or if the Marker is a registered forced marker.
-     * @see Logger#registerForcedMarker(Marker)
+     * @see ZLogger#registerForcedMarker(Marker)
      */
     @Override
     public boolean isWarnEnabled(@NotNull final Marker marker) {
@@ -489,7 +491,7 @@ public class Logger implements org.slf4j.Logger {
     /**
      * Check if log calls to Log Level {@link Level#ERROR} with the given {@link Marker} will be logged or ignored.
      * @return True, if the current Log Level is of Level Error, or if the Marker is a registered forced marker.
-     * @see Logger#registerForcedMarker(Marker)
+     * @see ZLogger#registerForcedMarker(Marker)
      */
     @Override
     public boolean isErrorEnabled(@NotNull final Marker marker) {
