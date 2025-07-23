@@ -119,7 +119,7 @@ public class Logger implements org.slf4j.Logger {
 
     private void log(@NotNull final Level level, @NotNull final String message) {
         if (isLoggable(level)) {
-            log("%s \u001b[38;5;240m[\u001b[0m%s\u001b[38;5;240m]\u001b[0m: %s %s".formatted(level.getPrefix(), name, level.getColor(), message));
+            log("%s \u001b[38;5;240m[\u001b[0m%s\u001b[38;5;240m]\u001b[0m:%s %s".formatted(level.getPrefix(), name, level.getColor(), message));
             consumer.forEach(c -> c.accept("%s [%s]: %s".formatted(level.name(), name, message)));
         }
         else if (alwaysRunConsumers) consumer.forEach(c -> c.accept("%s [%s]: %s".formatted(level.name(), name, message)));
@@ -127,7 +127,7 @@ public class Logger implements org.slf4j.Logger {
 
     private void log(@NotNull final Level level, @NotNull final Marker marker, @NotNull final String message) {
         if (isLoggable(marker,level)) {
-            log("%s \u001b[38;5;240m[\u001b[0m%s\u001b[38;5;240m] [\u001b[0m%s\u001b[38;5;240m]: %s %s".formatted(level.getPrefix(), marker.getName(), name, level.getColor(), message));
+            log("%s \u001b[38;5;240m[\u001b[0m%s\u001b[38;5;240m] [\u001b[0m%s\u001b[38;5;240m]:%s %s".formatted(level.getPrefix(), marker.getName(), name, level.getColor(), message));
             consumer.forEach(c -> c.accept("%s [%s] [%s]: %s".formatted(level.name(), marker.getName(), name, message)));
         }
         else if (alwaysRunConsumers) consumer.forEach(c -> c.accept("%s [%s] [%s]: %s".formatted(level.name(), marker.getName(), name, message)));
