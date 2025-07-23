@@ -1,22 +1,20 @@
 package dev.prodzeus.logger;
 
-import org.slf4j.ILoggerFactory;
-import org.slf4j.IMarkerFactory;
 import org.slf4j.spi.MDCAdapter;
 import org.slf4j.spi.SLF4JServiceProvider;
 
 public class SLF4JProvider implements SLF4JServiceProvider {
 
-    private final ILoggerFactory loggerFactory = new LoggerFactory();
-    private final IMarkerFactory markerFactory = new MarkerFactory();
+    private final LoggerFactory loggerFactory = new LoggerFactory();
+    private final MarkerFactory markerFactory = new MarkerFactory();
 
     @Override
-    public ILoggerFactory getLoggerFactory() {
+    public LoggerFactory getLoggerFactory() {
         return loggerFactory;
     }
 
     @Override
-    public IMarkerFactory getMarkerFactory() {
+    public MarkerFactory getMarkerFactory() {
         return markerFactory;
     }
 
