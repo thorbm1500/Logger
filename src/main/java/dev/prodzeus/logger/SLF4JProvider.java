@@ -1,12 +1,12 @@
 package dev.prodzeus.logger;
 
-import org.slf4j.spi.MDCAdapter;
 import org.slf4j.spi.SLF4JServiceProvider;
 
 public class SLF4JProvider implements SLF4JServiceProvider {
 
     private final LoggerFactory loggerFactory = new LoggerFactory();
     private final MarkerFactory markerFactory = new MarkerFactory();
+    private final MDCAdapter adapter = new MDCAdapter();
 
     @Override
     public LoggerFactory getLoggerFactory() {
@@ -20,7 +20,7 @@ public class SLF4JProvider implements SLF4JServiceProvider {
 
     @Override
     public MDCAdapter getMDCAdapter() {
-        return null;
+        return adapter;
     }
 
     @Override
@@ -29,5 +29,5 @@ public class SLF4JProvider implements SLF4JServiceProvider {
     }
 
     @Override
-    public void initialize() {}
+    public void initialize() { /* Empty */ }
 }
