@@ -1,13 +1,12 @@
 package dev.prodzeus;
 
-public enum Level {
+public enum Level implements Comparable<Level> {
     OFF("Off","[OFF]",0),
-    DEBUG("Debug","[DEBUG]",100),
+    TRACE("Debug","[DEBUG]",100),
+    DEBUG("Debug","[DEBUG]",200),
     INFO("Info","[INFO]",300),
     WARNING("Warning","[WARNING]",400),
     ERROR("Error","[ERROR]",500),
-    SEVERE("Severe","[SEVERE]", 800),
-    FATAL("Fatal","[FATAL]", 900),
     ALL("All","[ALL]",1000)
     ;
 
@@ -32,5 +31,9 @@ public enum Level {
 
     public String getPrefix() {
         return prefix;
+    }
+
+    public int compare(final Level o) {
+        return this.weight >= o.getWeight() ? (this.weight > o.getWeight() ? -1 : 0) : 1;
     }
 }

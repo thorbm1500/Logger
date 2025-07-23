@@ -1,112 +1,527 @@
 package dev.prodzeus;
 
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Marker;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 
-public class Logger {
+/**
+ * A simple logger with SLF4J implementation.
+ * @apiNote SLF4J Version: <b>2.0.12</b>
+ * @author prodzeus
+ */
+public class Logger implements org.slf4j.Logger {
 
-    private static String logPrefix = "";
-    public static Level level = Level.INFO;
-    private static Consumer<String> logConsumer = null;
+    private final String name;
+    private Level level = Level.INFO;
+    private final Set<Marker> forcedMarkers = new HashSet<>();
+    private final Set<Consumer<String>> consumer = new HashSet<>();
+    private boolean alwaysRunConsumers = false;
 
-    private Logger(final String logger) {
-        logPrefix = logger.stripTrailing().concat(" ");
+    /**
+     * Constructs a new Logger instance.
+     * @param name Name of the new Logger instance.
+     * @apiNote <b>This should only be called through the LoggerFactory!</b>
+     * @see LoggerFactory#getLogger(String)
+     */
+    public Logger(final String name) {
+        this.name = name;
     }
 
     /**
-     * Set the prefix for the logger.<br>
-     * Format printed:
-     * <code>prefix [LOGLEVEL] Log text goes here.</code>
-     * @param prefix The new log prefix.
-     * @apiNote A blank prefix can be provided to disable it all-together.
+     * Register a forced {@link Marker}.
+     * @param marker Marker to register.
+     * @apiNote A log with a forced marker will <b>always</b> be logged, regardless of the current {@link Level}.
      * @return The Logger instance.
      */
-    public Logger setPrefix(final String prefix) {
-        logPrefix = prefix.stripTrailing().concat(" ");
+    public Logger registerForcedMarker(@NotNull final Marker marker) {
+        this.forcedMarkers.add(marker);
         return this;
     }
 
     /**
-     * Add a consumer to be called on each LogEvent
-     * @param consumer Consumer.
+     * Unregister a forced {@link Marker}.
+     * @param marker Marker to unregister.
      * @return The Logger instance.
      */
-    public Logger onLog(@NotNull final Consumer<String> consumer) {
-        logConsumer = consumer;
+    public Logger unregisterForcedMarker(@NotNull final Marker marker) {
+        this.forcedMarkers.remove(marker);
         return this;
     }
 
-    private void logEvent(@NotNull final Level level, @NotNull final String log) {
-        if (logConsumer != null) logConsumer.accept(log);
+    /**
+     * Clear all registered forced {@link Marker}s.
+     * @return The Logger instance.
+     */
+    public Logger clearForcedMarkers() {
+        this.forcedMarkers.clear();
+        return this;
     }
 
-    private void print(@NotNull final Level level, @NotNull final String log) {
-        System.out.println(logPrefix + level.getPrefix() + " " + log);
-        logEvent(level,log);
+    /**
+     * Set the current Log Level. Any log call below this level will be ignored.
+     * @param level New Log Level.
+     * @return The Logger instance.
+     */
+    public Logger setLevel(@NotNull final Level level) {
+        this.level = level;
+        return this;
     }
 
-    private void print(@NotNull final Level level, @NotNull final String log, @NotNull final Object... args) {
-        print(level,format(log,args));
+    /**
+     * Get the current log level set.
+     * Any logs logged below this level will be ignored,
+     * unless a forced marker has been registered.
+     * @return The current Level.
+     * @see Logger#registerForcedMarker(Marker) 
+     */
+    @NotNull
+    @Contract(pure = true)
+    public Level getLevel() {
+        return level;
     }
 
-    public void log(@NotNull final Level level, @NotNull final String log) {
-        print(level, log);
+    /**
+     * Check if a level is loggable.
+     * @param level The Level to check.
+     * @return True, if log calls at this level are logged to console, otherwise false.
+     */
+    @Contract(pure = true)
+    public boolean isLoggable(@NotNull final Level level) {
+        return this.level.getWeight() >= level.getWeight();
     }
 
-    public void log(@NotNull final Level level, @NotNull final String log, @NotNull final Object... args) {
-        print(level,log,args);
+    /**
+     * Check if a level or marker is loggable.
+     * @param marker The marker.
+     * @param level The level.
+     * @return True, if the level is equal to or higher than the current Log Level,
+     * or if the marker is a registered forced marker, otherwise false.
+     * @see Logger#registerForcedMarker(Marker) 
+     */
+    @Contract(pure = true)
+    public boolean isLoggable(@NotNull final Marker marker, final Level level) {
+        if (forcedMarkers.contains(marker)) return true;
+        return isLoggable(level);
     }
 
-    public void debug(@NotNull final String log) {
-        print(Level.DEBUG,log);
+    private void log(@NotNull final String message) {
+        System.out.println(message);
+        consumer.forEach(c -> c.accept(message));
     }
 
-    public void debug(@NotNull final String log, @NotNull final Object... args) {
-        print(Level.DEBUG,log,args);
+    private void log(@NotNull final Level level, @NotNull final String message) {
+        if (isLoggable(level)) log("%s [%s]: %s".formatted(level.name(), name, message));
+        else if (alwaysRunConsumers) consumer.forEach(c -> c.accept("%s [%s]: %s".formatted(level.name(), name, message)));
     }
 
-    public void info(@NotNull final String log) {
-        print(Level.INFO,log);
+    private void log(@NotNull final Level level, @NotNull final Marker marker, @NotNull final String message) {
+        if (isLoggable(marker,level)) log("%s [%s] [%s]: %s".formatted(level.name(), marker.getName(), name, message));
+        else if (alwaysRunConsumers) consumer.forEach(c -> c.accept("%s [%s] [%s]: %s".formatted(level.name(), marker.getName(), name, message)));
     }
 
-    public void info(@NotNull final String log, @NotNull final Object... args) {
-        print(Level.INFO,log,args);
+    /**
+     * Whether consumers should ignore the Log Level.
+     * Setting this to true will ensure that consumers are always passed the log,
+     * regardless of the current Log Level.
+     * @param enable True | False
+     * @return The Logger instance.
+     */
+    public Logger alwaysRunConsumers(final boolean enable) {
+        this.alwaysRunConsumers = enable;
+        return this;
     }
 
-    public void warn(@NotNull final String log) {
-        print(Level.WARNING,log);
+    /**
+     * Add a consumer to the Logger.
+     * Any log call will be passed to all registered consumers.
+     * @param consumer New consumer to add.
+     * @return The Logger instance.
+     *
+     */
+    public Logger registerConsumer(@NotNull final Consumer<String> consumer) {
+        this.consumer.add(consumer);
+        return this;
     }
 
-    public void warn(@NotNull final String log, @NotNull final Object... args) {
-        print(Level.WARNING,log,args);
+    /**
+     * Unregister a consumer from the Logger.
+     * @param consumer Consumer to unregister.
+     * @return The Logger instance.
+     */
+    public Logger unregisterConsumer(@NotNull final Consumer<String> consumer) {
+        this.consumer.remove(consumer);
+        return this;
     }
 
-    public void error(@NotNull final String log) {
-        print(Level.ERROR,log);
+    /**
+     * Clear all registered Consumers.
+     * @return The Logger instance.
+     */
+    public Logger clearConsumers() {
+        this.consumer.clear();
+        return this;
     }
 
-    public void error(@NotNull final String log, @NotNull final Object... args) {
-        print(Level.ERROR,log,args);
+    /**
+     * Get the name of the Logger instance.
+     * @return The name.
+     */
+    @Override
+    public String getName() {
+        return name;
     }
 
-    public void severe(@NotNull final String log) {
-        print(Level.SEVERE,log);
+    /**
+     * Check if log calls to Log Level {@link Level#TRACE} will be logged or ignored.
+     * @return True | False
+     */
+    @Override
+    public boolean isTraceEnabled() {
+        return isLoggable(Level.TRACE);
     }
 
-    public void severe(@NotNull final String log, @NotNull final Object... args) {
-        print(Level.SEVERE,log,args);
+    @Override
+    public void trace(@NotNull final String message) {
+        log(Level.TRACE,message);
     }
 
-    public void fatal(@NotNull final String log) {
-        print(Level.SEVERE,log);
+    @Override
+    public void trace(@NotNull String message, @NotNull final Object arg) {
+        trace(format(message,arg));
     }
 
-    public void fatal(@NotNull final String log, @NotNull final Object... args) {
-        print(Level.SEVERE,log,args);
+    @Override
+    public void trace(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
+        trace(format(message,arg1,arg2));
     }
 
+    @Override
+    public void trace(@NotNull String message, @NotNull final Object... args) {
+        trace(format(message,args));
+    }
+
+    @Override
+    public void trace(@NotNull String message, @NotNull final Throwable t) {
+        trace(format(message,t));
+    }
+
+    /**
+     * Check if log calls to Log Level {@link Level#TRACE} with the given {@link Marker} will be logged or ignored.
+     * @return True, if the current Log Level is of Level Trace, or if the Marker is a registered forced marker.
+     * @see Logger#registerForcedMarker(Marker)
+     */
+    @Override
+    public boolean isTraceEnabled(@NotNull final Marker marker) {
+        return isLoggable(marker,Level.TRACE);
+    }
+
+    @Override
+    public void trace(@NotNull final Marker marker, @NotNull final String message) {
+        log(Level.TRACE,marker,message);
+    }
+
+    @Override
+    public void trace(@NotNull final Marker marker, String message, @NotNull final Object arg) {
+        trace(marker,format(message,arg));
+    }
+
+    @Override
+    public void trace(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
+        trace(marker,format(message,arg1,arg2));
+    }
+
+    @Override
+    public void trace(@NotNull final Marker marker, String message, Object... args) {
+        trace(marker,format(message,args));
+    }
+
+    @Override
+    public void trace(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
+        trace(marker,format(message,t));
+    }
+
+    /**
+     * Check if log calls to Log Level {@link Level#DEBUG} will be logged or ignored.
+     * @return True | False
+     */
+    @Override
+    public boolean isDebugEnabled() {
+        return isLoggable(Level.DEBUG);
+    }
+
+    @Override
+    public void debug(@NotNull final String message) {
+        log(Level.DEBUG,message);
+    }
+
+    @Override
+    public void debug(@NotNull final String message, @NotNull final Object arg) {
+        debug(format(message,arg));
+    }
+
+    @Override
+    public void debug(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
+        debug(format(message,arg1,arg2));
+    }
+
+    @Override
+    public void debug(@NotNull final String message, @NotNull final Object... args) {
+        debug(format(message,args));
+    }
+
+    @Override
+    public void debug(@NotNull final String message, @NotNull final Throwable t) {
+        debug(format(message,t));
+    }
+
+    /**
+     * Check if log calls to Log Level {@link Level#DEBUG} with the given {@link Marker} will be logged or ignored.
+     * @return True, if the current Log Level is of Level Debug, or if the Marker is a registered forced marker.
+     * @see Logger#registerForcedMarker(Marker)
+     */
+    @Override
+    public boolean isDebugEnabled(@NotNull final Marker marker) {
+        return isLoggable(marker,Level.DEBUG);
+    }
+
+    @Override
+    public void debug(@NotNull final Marker marker, @NotNull final String message) {
+        log(Level.DEBUG,marker,message);
+    }
+
+    @Override
+    public void debug(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
+        debug(marker,format(message,arg));
+    }
+
+    @Override
+    public void debug(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
+        debug(marker,format(message,arg1,arg2));
+    }
+
+    @Override
+    public void debug(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... args) {
+        debug(marker,format(message,args));
+    }
+
+    @Override
+    public void debug(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
+        debug(marker,format(message,t));
+    }
+
+    /**
+     * Check if log calls to Log Level {@link Level#INFO} will be logged or ignored.
+     * @return True | False
+     */
+    @Override
+    public boolean isInfoEnabled() {
+        return isLoggable(Level.INFO);
+    }
+
+    @Override
+    public void info(@NotNull final String message) {
+        log(Level.INFO,message);
+    }
+
+    @Override
+    public void info(@NotNull final String message, @NotNull final Object arg) {
+        info(format(message,arg));
+    }
+
+    @Override
+    public void info(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
+        info(format(message,arg1,arg2));
+    }
+
+    @Override
+    public void info(@NotNull final String message, @NotNull final Object... arguments) {
+        info(format(message,arguments));
+    }
+
+    @Override
+    public void info(@NotNull final String message, @NotNull final Throwable t) {
+        info(format(message,t));
+    }
+
+    /**
+     * Check if log calls to Log Level {@link Level#INFO} with the given {@link Marker} will be logged or ignored.
+     * @return True, if the current Log Level is of Level Info, or if the Marker is a registered forced marker.
+     * @see Logger#registerForcedMarker(Marker)
+     */
+    @Override
+    public boolean isInfoEnabled(@NotNull final Marker marker) {
+        return isLoggable(marker,Level.INFO);
+    }
+
+    @Override
+    public void info(@NotNull final Marker marker, @NotNull final String message) {
+        log(Level.INFO,marker,message);
+    }
+
+    @Override
+    public void info(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
+        info(marker,format(message,arg));
+    }
+
+    @Override
+    public void info(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
+        info(marker,format(message,arg1,arg2));
+    }
+
+    @Override
+    public void info(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... arguments) {
+        info(marker,format(message,arguments));
+    }
+
+    @Override
+    public void info(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
+        info(marker,format(message,t));
+    }
+
+    /**
+     * Check if log calls to Log Level {@link Level#WARNING} will be logged or ignored.
+     * @return True | False
+     */
+    @Override
+    public boolean isWarnEnabled() {
+        return isLoggable(Level.WARNING);
+    }
+
+    @Override
+    public void warn(@NotNull final String message) {
+        log(Level.WARNING,message);
+    }
+
+    @Override
+    public void warn(@NotNull final String message, @NotNull final Object arg) {
+        warn(format(message,arg));
+    }
+
+    @Override
+    public void warn(@NotNull final String message, @NotNull final Object... arguments) {
+        warn(format(message,arguments));
+    }
+
+    @Override
+    public void warn(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
+        warn(format(message,arg1,arg2));
+    }
+
+    @Override
+    public void warn(@NotNull final String message, @NotNull final Throwable t) {
+        warn(format(message,t));
+    }
+
+    /**
+     * Check if log calls to Log Level {@link Level#WARNING} with the given {@link Marker} will be logged or ignored.
+     * @return True, if the current Log Level is of Level Warning, or if the Marker is a registered forced marker.
+     * @see Logger#registerForcedMarker(Marker)
+     */
+    @Override
+    public boolean isWarnEnabled(@NotNull final Marker marker) {
+        return isLoggable(marker,Level.WARNING);
+    }
+
+    @Override
+    public void warn(@NotNull final Marker marker, @NotNull final String message) {
+        log(Level.WARNING,marker,message);
+    }
+
+    @Override
+    public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
+        warn(marker,format(message,arg));
+    }
+
+    @Override
+    public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
+        warn(marker,format(message,arg1,arg2));
+    }
+
+    @Override
+    public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... arguments) {
+        warn(marker,format(message,arguments));
+    }
+
+    @Override
+    public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
+        warn(marker,format(message,t));
+    }
+
+    /**
+     * Check if log calls to Log Level {@link Level#ERROR} will be logged or ignored.
+     * @return True | False
+     */
+    @Override
+    public boolean isErrorEnabled() {
+        return isLoggable(Level.ERROR);
+    }
+
+    @Override
+    public void error(@NotNull final String message) {
+        log(Level.ERROR,message);
+    }
+
+    @Override
+    public void error(@NotNull final String message, @NotNull final Object arg) {
+        error(format(message,arg));
+    }
+
+    @Override
+    public void error(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
+        error(format(message,arg1,arg2));
+    }
+
+    @Override
+    public void error(@NotNull final String message, @NotNull final Object... arguments) {
+        error(format(message,arguments));
+    }
+
+    @Override
+    public void error(@NotNull final String message, @NotNull final Throwable t) {
+        error(format(message,t));
+    }
+
+    /**
+     * Check if log calls to Log Level {@link Level#ERROR} with the given {@link Marker} will be logged or ignored.
+     * @return True, if the current Log Level is of Level Error, or if the Marker is a registered forced marker.
+     * @see Logger#registerForcedMarker(Marker)
+     */
+    @Override
+    public boolean isErrorEnabled(@NotNull final Marker marker) {
+        return isLoggable(marker,Level.ERROR);
+    }
+
+    @Override
+    public void error(@NotNull final Marker marker, @NotNull final String message) {
+        log(Level.ERROR,marker,message);
+    }
+
+    @Override
+    public void error(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
+        error(marker,format(message,arg));
+    }
+
+    @Override
+    public void error(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
+        error(marker,format(message,arg1,arg2));
+    }
+
+    @Override
+    public void error(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... arguments) {
+        error(marker,format(message,arguments));
+    }
+
+    @Override
+    public void error(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
+        error(marker,format(message,t));
+    }
+
+    @NotNull
     private static String format(@NotNull String log, @NotNull final Object... args) {
         for (final Object arg : args) {
             switch (arg) {
@@ -129,9 +544,5 @@ public class Logger {
             }
         }
         return log;
-    }
-
-    public static Logger getLogger(final String logger) {
-        return new Logger(logger);
     }
 }
