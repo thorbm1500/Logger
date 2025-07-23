@@ -95,7 +95,7 @@ public class Logger implements org.slf4j.Logger {
      */
     @Contract(pure = true)
     public boolean isLoggable(@NotNull final Level level) {
-        return this.level.getWeight() >= level.getWeight();
+        return this.level.getWeight() <= level.getWeight();
     }
 
     /**
@@ -118,12 +118,12 @@ public class Logger implements org.slf4j.Logger {
     }
 
     private void log(@NotNull final Level level, @NotNull final String message) {
-        if (isLoggable(level)) log("%s [%s]: %s".formatted(level.name(), name, message));
+        if (isLoggable(level)) log("%s [%s]: %s %s".formatted(level.getPrefix(), name, level.getColor(), message));
         else if (alwaysRunConsumers) consumer.forEach(c -> c.accept("%s [%s]: %s".formatted(level.name(), name, message)));
     }
 
     private void log(@NotNull final Level level, @NotNull final Marker marker, @NotNull final String message) {
-        if (isLoggable(marker,level)) log("%s [%s] [%s]: %s".formatted(level.name(), marker.getName(), name, message));
+        if (isLoggable(marker,level)) log("%s [%s] [%s]: %s %s".formatted(level.getPrefix(), marker.getName(), name, level.getColor(), message));
         else if (alwaysRunConsumers) consumer.forEach(c -> c.accept("%s [%s] [%s]: %s".formatted(level.name(), marker.getName(), name, message)));
     }
 
