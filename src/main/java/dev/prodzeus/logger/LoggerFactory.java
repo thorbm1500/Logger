@@ -2,11 +2,10 @@ package dev.prodzeus.logger;
 
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.ILoggerFactory;
-import org.slf4j.Logger;
 
 import java.util.concurrent.ConcurrentHashMap;
 
-public class ZLoggerFactory implements ILoggerFactory {
+public class LoggerFactory implements ILoggerFactory {
 
     private static final ConcurrentHashMap<String, Logger> loggers = new ConcurrentHashMap<>();
 
@@ -18,6 +17,6 @@ public class ZLoggerFactory implements ILoggerFactory {
      */
     @Override
     public Logger getLogger(@NotNull final String name) {
-        return loggers.computeIfAbsent(name, ZLogger::new);
+        return loggers.computeIfAbsent(name, Logger::new);
     }
 }
