@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>dev.prodzeus.logger</groupId>
-    <artifactId>Logger</artifactId>
+    <artifactId>logger</artifactId>
     <version>1.0.0</version>
 
     <properties>
