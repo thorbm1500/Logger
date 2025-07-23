@@ -4,7 +4,9 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Marker;
 
+import java.util.Collection;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
@@ -532,6 +534,22 @@ public class Logger implements org.slf4j.Logger {
                     for (final StackTraceElement st : t.getStackTrace()) {
                         builder.append(st.toString()).append("\n");
                     }
+                    message = message.replaceFirst("\\{}", Matcher.quoteReplacement(builder.toString()));
+                }
+                case Collection<?> c -> {
+                    final StringBuilder builder = new StringBuilder();
+                    for (final Object o : c) {
+                        builder.append(String.valueOf(o)).append("\n");
+                    }
+                    message = message.replaceFirst("\\{}", Matcher.quoteReplacement(builder.toString()));
+                }
+                case Map<?,?> m -> {
+                    final StringBuilder builder = new StringBuilder();
+                    builder.append("{");
+                    for (final var index : m.entrySet()) {
+                        builder.append(" [ %s , %s ] ".formatted(String.valueOf(index.getKey()), String.valueOf(index.getValue())));
+                    }
+                    builder.append("}");
                     message = message.replaceFirst("\\{}", Matcher.quoteReplacement(builder.toString()));
                 }
                 case String s -> message = message.replaceFirst("\\{}", Matcher.quoteReplacement(s));
