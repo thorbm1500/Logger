@@ -5,6 +5,7 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.Marker;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -524,27 +525,21 @@ public class ZLogger implements Logger {
     }
 
     @NotNull
-    private static String format(@NotNull String log, @NotNull final Object... args) {
+    private static String format(@NotNull final String log, @NotNull final Object... args) {
+        String message = log;
         for (final Object arg : args) {
             switch (arg) {
-                case String s -> log = log.replaceFirst("\\{}", Matcher.quoteReplacement(s));
-                case Exception e -> {
-                    String replacement = "";
-                    for (final StackTraceElement st : e.getStackTrace()) {
-                        replacement = replacement.concat(st.toString()).concat("\n");
-                    }
-                    log = log.replaceFirst("\\{}", Matcher.quoteReplacement(replacement));
-                }
                 case Throwable t -> {
-                    String replacement = "";
+                    final StringBuilder builder = new StringBuilder();
                     for (final StackTraceElement st : t.getStackTrace()) {
-                        replacement = replacement.concat(st.toString()).concat("\n");
+                        builder.append(st.toString()).append("\n");
                     }
-                    log = log.replaceFirst("\\{}", Matcher.quoteReplacement(replacement));
+                    message = message.replaceFirst("\\{}", Matcher.quoteReplacement(builder.toString()));
                 }
-                default -> log = log.replaceFirst("\\{}", Matcher.quoteReplacement(String.valueOf(arg)));
+                case String s -> message = message.replaceFirst("\\{}", Matcher.quoteReplacement(s));
+                default -> message = message.replaceFirst("\\{}", Matcher.quoteReplacement(arg.toString()));
             }
         }
-        return log;
+        return message;
     }
 }
