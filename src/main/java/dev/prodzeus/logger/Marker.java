@@ -1,4 +1,4 @@
-package dev.prodzeus;
+package dev.prodzeus.logger;
 
 import org.jetbrains.annotations.NotNull;
 

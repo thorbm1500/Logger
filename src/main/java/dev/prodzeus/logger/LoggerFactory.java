@@ -1,4 +1,4 @@
-package dev.prodzeus;
+package dev.prodzeus.logger;
 
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.ILoggerFactory;
@@ -18,6 +18,6 @@ public class LoggerFactory implements ILoggerFactory {
      */
     @Override
     public Logger getLogger(@NotNull final String name) {
-        return loggers.computeIfAbsent(name, dev.prodzeus.Logger::new);
+        return loggers.computeIfAbsent(name, dev.prodzeus.logger.Logger::new);
     }
 }

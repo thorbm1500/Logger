@@ -1,4 +1,4 @@
-package dev.prodzeus;
+package dev.prodzeus.logger;
 
 import org.slf4j.ILoggerFactory;
 import org.slf4j.IMarkerFactory;

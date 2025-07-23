@@ -1,4 +1,4 @@
-package dev.prodzeus;
+package dev.prodzeus.logger;
 
 public enum Level implements Comparable<Level> {
     OFF("Off","[OFF]",0),
