@@ -120,14 +120,14 @@ public class Logger implements org.slf4j.Logger {
 
     private void log(@NotNull final Level level, @NotNull final String message) {
         final String log = level.getPrefix()+loggerName+level.getColor()+message;
-        if (isLoggable(level)) log(log,"["+level+"] "+name+" "+level.getColor()+message);
-        else if (alwaysRunConsumers) consumer.forEach(c -> c.accept("["+level+"] "+name+" "+level.getColor()+message));
+        if (isLoggable(level)) log(log,"["+level+"] "+name+" "+message);
+        else if (alwaysRunConsumers) consumer.forEach(c -> c.accept("["+level+"] "+name+" "+message));
     }
 
     private void log(@NotNull final Level level, @NotNull final Marker marker, @NotNull final String message) {
         final String log = level.getPrefix()+"["+marker.getName()+"]"+loggerName+level.getColor()+message;
-        if (isLoggable(marker,level)) log(log,"["+level+"]"+" ["+marker.getName()+"] "+name+" "+level.getColor()+message);
-        else if (alwaysRunConsumers) consumer.forEach(c -> c.accept("["+level+"]"+" ["+marker.getName()+"] "+name+" "+level.getColor()+message));
+        if (isLoggable(marker,level)) log(log,"["+level+"]"+" ["+marker.getName()+"] "+name+" "+message);
+        else if (alwaysRunConsumers) consumer.forEach(c -> c.accept("["+level+"]"+" ["+marker.getName()+"] "+name+" "+message));
     }
 
     /**
