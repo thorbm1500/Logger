@@ -113,21 +113,21 @@ public class Logger implements org.slf4j.Logger {
         return isLoggable(level);
     }
 
-    private void log(@NotNull final String message) {
+    private void log(@NotNull final String message, @NotNull final String rawLog) {
         System.out.println(message);
-        consumer.forEach(c -> c.accept(message));
+        consumer.forEach(c -> c.accept(rawLog));
     }
 
     private void log(@NotNull final Level level, @NotNull final String message) {
         final String log = level.getPrefix()+loggerName+level.getColor()+message;
-        if (isLoggable(level)) log(log);
-        else if (alwaysRunConsumers) consumer.forEach(c -> c.accept(log));
+        if (isLoggable(level)) log(log,"["+level+"] "+name+" "+level.getColor()+message);
+        else if (alwaysRunConsumers) consumer.forEach(c -> c.accept("["+level+"] "+name+" "+level.getColor()+message));
     }
 
     private void log(@NotNull final Level level, @NotNull final Marker marker, @NotNull final String message) {
         final String log = level.getPrefix()+"["+marker.getName()+"]"+loggerName+level.getColor()+message;
-        if (isLoggable(marker,level)) log(log);
-        else if (alwaysRunConsumers) consumer.forEach(c -> c.accept(log));
+        if (isLoggable(marker,level)) log(log,"["+level+"]"+" ["+marker.getName()+"] "+name+" "+level.getColor()+message);
+        else if (alwaysRunConsumers) consumer.forEach(c -> c.accept("["+level+"]"+" ["+marker.getName()+"] "+name+" "+level.getColor()+message));
     }
 
     /**
