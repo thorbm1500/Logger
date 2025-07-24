@@ -4,10 +4,7 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Marker;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 
@@ -20,7 +17,8 @@ import java.util.regex.Matcher;
 public class Logger implements org.slf4j.Logger {
 
     private final String name;
-    private Level level = Level.INFO;
+    private final String loggerName;
+    private Level level;
     private final Set<Marker> forcedMarkers = new HashSet<>();
     private final Set<Consumer<String>> consumer = new HashSet<>();
     private boolean alwaysRunConsumers = false;
@@ -33,7 +31,9 @@ public class Logger implements org.slf4j.Logger {
      */
     public Logger(final String name) {
         this.name = name;
-        log(Level.INFO,"\u001b[38;5;46mNew Logger instance created.");
+        this.loggerName = " \u001b[38;5;240m[\u001b[0m" + name +"\u001b[38;5;240m]\u001b[0m ";
+        setLevel(Level.INFO);
+        info("\u001b[38;5;46mNew Logger instance created.");
     }
 
     /**
@@ -115,22 +115,19 @@ public class Logger implements org.slf4j.Logger {
 
     private void log(@NotNull final String message) {
         System.out.println(message);
+        consumer.forEach(c -> c.accept(message));
     }
 
     private void log(@NotNull final Level level, @NotNull final String message) {
-        if (isLoggable(level)) {
-            log("%s \u001b[38;5;240m[\u001b[0m%s\u001b[38;5;240m]\u001b[0m:%s %s".formatted(level.getPrefix(), name, level.getColor(), message));
-            consumer.forEach(c -> c.accept("%s [%s]: %s".formatted(level.name(), name, message)));
-        }
-        else if (alwaysRunConsumers) consumer.forEach(c -> c.accept("%s [%s]: %s".formatted(level.name(), name, message)));
+        final String log = level.getPrefix()+loggerName+level.getColor()+message;
+        if (isLoggable(level)) log(log);
+        else if (alwaysRunConsumers) consumer.forEach(c -> c.accept(log));
     }
 
     private void log(@NotNull final Level level, @NotNull final Marker marker, @NotNull final String message) {
-        if (isLoggable(marker,level)) {
-            log("%s \u001b[38;5;240m[\u001b[0m%s\u001b[38;5;240m] [\u001b[0m%s\u001b[38;5;240m]:%s %s".formatted(level.getPrefix(), marker.getName(), name, level.getColor(), message));
-            consumer.forEach(c -> c.accept("%s [%s] [%s]: %s".formatted(level.name(), marker.getName(), name, message)));
-        }
-        else if (alwaysRunConsumers) consumer.forEach(c -> c.accept("%s [%s] [%s]: %s".formatted(level.name(), marker.getName(), name, message)));
+        final String log = level.getPrefix()+"["+marker.getName()+"]"+loggerName+level.getColor()+message;
+        if (isLoggable(marker,level)) log(log);
+        else if (alwaysRunConsumers) consumer.forEach(c -> c.accept(log));
     }
 
     /**
@@ -150,10 +147,20 @@ public class Logger implements org.slf4j.Logger {
      * Any log call will be passed to all registered consumers.
      * @param consumer New consumer to add.
      * @return The Logger instance.
-     *
      */
     public Logger registerConsumer(@NotNull final Consumer<String> consumer) {
         this.consumer.add(consumer);
+        return this;
+    }
+
+    /**
+     * Add consumers to the Logger.
+     * Any log call will be passed to all registered consumers.
+     * @param consumers New consumers to add.
+     * @return The Logger instance.
+     */
+    public final Logger registerConsumer(@NotNull final Consumer<String>... consumers) {
+        for(final Consumer<String> c : consumers) registerConsumer(c);
         return this;
     }
 
@@ -165,6 +172,14 @@ public class Logger implements org.slf4j.Logger {
     public Logger unregisterConsumer(@NotNull final Consumer<String> consumer) {
         this.consumer.remove(consumer);
         return this;
+    }
+
+    /**
+     * Get all registered consumers.
+     * @return All registered consumers, or an empty set if no consumers have been registered.
+     */
+    public Set<Consumer<String>> getConsumers() {
+        return consumer;
     }
 
     /**
@@ -532,21 +547,25 @@ public class Logger implements org.slf4j.Logger {
 
     @NotNull
     private static String format(@NotNull final String log, @NotNull final Object... args) {
-        String message = log;
+        String message = log.replace("%s","{}").replace("%d","{}");
         for (final Object arg : args) {
             switch (arg) {
                 case Throwable t -> {
                     final StringBuilder builder = new StringBuilder();
                     for (final StackTraceElement st : t.getStackTrace()) {
-                        builder.append(st.toString()).append("\n");
+                        builder.append(Level.ERROR.getColor()).append(st.toString()).append("\n");
                     }
                     message = message.replaceFirst("\\{}", Matcher.quoteReplacement(builder.toString()));
                 }
                 case Collection<?> c -> {
                     final StringBuilder builder = new StringBuilder();
-                    for (final Object o : c) {
-                        builder.append(String.valueOf(o)).append("\n");
+                    builder.append("[ ");
+                    final Iterator<?> iterator = c.iterator();
+                    while (iterator.hasNext()) {
+                        builder.append(iterator.next());
+                        if (iterator.hasNext()) builder.append(", ");
                     }
+                    builder.append(" ]");
                     message = message.replaceFirst("\\{}", Matcher.quoteReplacement(builder.toString()));
                 }
                 case Map<?,?> m -> {
