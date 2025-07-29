@@ -10,8 +10,9 @@ import java.util.regex.Matcher;
 
 /**
  * A simple logger with SLF4J implementation.
- * @apiNote SLF4J Version: <b>2.0.12</b>
+ *
  * @author prodzeus
+ * @apiNote SLF4J Version: <b>2.0.12</b>
  */
 @SuppressWarnings("unused")
 public class Logger implements org.slf4j.Logger {
@@ -25,22 +26,24 @@ public class Logger implements org.slf4j.Logger {
 
     /**
      * Constructs a new Logger instance.
+     *
      * @param name Name of the new Logger instance.
      * @apiNote <b>This should only be called through the LoggerFactory!</b>
      * @see LoggerFactory#getLogger(String)
      */
     public Logger(final String name) {
         this.name = name;
-        this.loggerName = " \u001b[38;5;240m[\u001b[0m" + name +"\u001b[38;5;240m]\u001b[0m ";
+        this.loggerName = " \u001b[38;5;240m[\u001b[0m" + name + "\u001b[38;5;240m]\u001b[0m ";
         setLevel(Level.INFO);
         info("\u001b[38;5;46mNew Logger instance created.");
     }
 
     /**
      * Register a forced {@link Marker}.
+     *
      * @param marker Marker to register.
-     * @apiNote A log with a forced marker will <b>always</b> be logged, regardless of the current {@link Level}.
      * @return The Logger instance.
+     * @apiNote A log with a forced marker will <b>always</b> be logged, regardless of the current {@link Level}.
      */
     public Logger registerForcedMarker(@NotNull final Marker marker) {
         this.forcedMarkers.add(marker);
@@ -49,6 +52,7 @@ public class Logger implements org.slf4j.Logger {
 
     /**
      * Unregister a forced {@link Marker}.
+     *
      * @param marker Marker to unregister.
      * @return The Logger instance.
      */
@@ -59,6 +63,7 @@ public class Logger implements org.slf4j.Logger {
 
     /**
      * Clear all registered forced {@link Marker}s.
+     *
      * @return The Logger instance.
      */
     public Logger clearForcedMarkers() {
@@ -68,6 +73,7 @@ public class Logger implements org.slf4j.Logger {
 
     /**
      * Set the current Log Level. Any log call below this level will be ignored.
+     *
      * @param level New Log Level.
      * @return The Logger instance.
      */
@@ -80,6 +86,7 @@ public class Logger implements org.slf4j.Logger {
      * Get the current log level set.
      * Any logs logged below this level will be ignored,
      * unless a forced marker has been registered.
+     *
      * @return The current Level.
      * @see Logger#registerForcedMarker(Marker)
      */
@@ -91,6 +98,7 @@ public class Logger implements org.slf4j.Logger {
 
     /**
      * Check if a level is loggable.
+     *
      * @param level The Level to check.
      * @return True, if log calls at this level are logged to console, otherwise false.
      */
@@ -101,8 +109,9 @@ public class Logger implements org.slf4j.Logger {
 
     /**
      * Check if a level or marker is loggable.
+     *
      * @param marker The marker.
-     * @param level The level.
+     * @param level  The level.
      * @return True, if the level is equal to or higher than the current Log Level,
      * or if the marker is a registered forced marker, otherwise false.
      * @see Logger#registerForcedMarker(Marker)
@@ -113,27 +122,39 @@ public class Logger implements org.slf4j.Logger {
         return isLoggable(level);
     }
 
-    private void log(@NotNull final String message, @NotNull final String rawLog) {
-        System.out.println(message);
-        consumer.forEach(c -> c.accept(rawLog));
+    private synchronized void runConsumers(@NotNull final String log) {
+        for (final Consumer<String> c : consumer) {
+            try {
+                c.accept(log);
+            } catch (final Exception e) {
+                System.out.println(Level.ERROR.getPrefix() + "dev.prodzeus.logger" + Level.ERROR.getColor() + "Exception caught while running consumer! " + e.getMessage());
+            }
+        }
+
+    }
+
+    private void log(@NotNull final Level level, @NotNull final String message, @NotNull final String consumerMessage) {
+        if (isLoggable(level)) System.out.println(message);
+        if (isLoggable(level) || alwaysRunConsumers) runConsumers(consumerMessage);
     }
 
     private void log(@NotNull final Level level, @NotNull final String message) {
-        final String log = level.getPrefix()+loggerName+level.getColor()+message;
-        if (isLoggable(level)) log(log,"["+level+"] "+name+" "+message);
-        else if (alwaysRunConsumers) consumer.forEach(c -> c.accept("["+level+"] "+name+" "+message));
+        log(level,
+                level.getPrefix() + loggerName + level.getColor() + message,
+                "[" + level + "] " + name + " " + message);
     }
 
     private void log(@NotNull final Level level, @NotNull final Marker marker, @NotNull final String message) {
-        final String log = level.getPrefix()+"["+marker.getName()+"]"+loggerName+level.getColor()+message;
-        if (isLoggable(marker,level)) log(log,"["+level+"]"+" ["+marker.getName()+"] "+name+" "+message);
-        else if (alwaysRunConsumers) consumer.forEach(c -> c.accept("["+level+"]"+" ["+marker.getName()+"] "+name+" "+message));
+        log(level,
+                level.getPrefix() + "[" + marker.getName() + "]" + loggerName + level.getColor() + message,
+                "[" + level + "]" + " [" + marker.getName() + "] " + name + " " + message);
     }
 
     /**
      * Whether consumers should ignore the Log Level.
      * Setting this to true will ensure that consumers are always passed the log,
      * regardless of the current Log Level.
+     *
      * @param enable True | False
      * @return The Logger instance.
      */
@@ -145,6 +166,7 @@ public class Logger implements org.slf4j.Logger {
     /**
      * Add a consumer to the Logger.
      * Any log call will be passed to all registered consumers.
+     *
      * @param consumer New consumer to add.
      * @return The Logger instance.
      */
@@ -156,16 +178,18 @@ public class Logger implements org.slf4j.Logger {
     /**
      * Add consumers to the Logger.
      * Any log call will be passed to all registered consumers.
+     *
      * @param consumers New consumers to add.
      * @return The Logger instance.
      */
     public final Logger registerConsumer(@NotNull final Consumer<String>... consumers) {
-        for(final Consumer<String> c : consumers) registerConsumer(c);
+        for (final Consumer<String> c : consumers) registerConsumer(c);
         return this;
     }
 
     /**
      * Unregister a consumer from the Logger.
+     *
      * @param consumer Consumer to unregister.
      * @return The Logger instance.
      */
@@ -176,6 +200,7 @@ public class Logger implements org.slf4j.Logger {
 
     /**
      * Get all registered consumers.
+     *
      * @return All registered consumers, or an empty set if no consumers have been registered.
      */
     public Set<Consumer<String>> getConsumers() {
@@ -184,6 +209,7 @@ public class Logger implements org.slf4j.Logger {
 
     /**
      * Clear all registered Consumers.
+     *
      * @return The Logger instance.
      */
     public Logger clearConsumers() {
@@ -193,6 +219,7 @@ public class Logger implements org.slf4j.Logger {
 
     /**
      * Get the name of the Logger instance.
+     *
      * @return The name.
      */
     @Override
@@ -202,6 +229,7 @@ public class Logger implements org.slf4j.Logger {
 
     /**
      * Check if log calls to Log Level {@link Level#TRACE} will be logged or ignored.
+     *
      * @return True | False
      */
     @Override
@@ -211,66 +239,68 @@ public class Logger implements org.slf4j.Logger {
 
     @Override
     public void trace(@NotNull final String message) {
-        log(Level.TRACE,message);
+        log(Level.TRACE, message);
     }
 
     @Override
     public void trace(@NotNull String message, @NotNull final Object arg) {
-        trace(format(message,arg));
+        trace(format(message, arg));
     }
 
     @Override
     public void trace(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
-        trace(format(message,arg1,arg2));
+        trace(format(message, arg1, arg2));
     }
 
     @Override
     public void trace(@NotNull String message, @NotNull final Object... args) {
-        trace(format(message,args));
+        trace(format(message, args));
     }
 
     @Override
     public void trace(@NotNull String message, @NotNull final Throwable t) {
-        trace(format(message,t));
+        trace(format(message, t));
     }
 
     /**
      * Check if log calls to Log Level {@link Level#TRACE} with the given {@link Marker} will be logged or ignored.
+     *
      * @return True, if the current Log Level is of Level Trace, or if the Marker is a registered forced marker.
      * @see Logger#registerForcedMarker(Marker)
      */
     @Override
     public boolean isTraceEnabled(@NotNull final Marker marker) {
-        return isLoggable(marker,Level.TRACE);
+        return isLoggable(marker, Level.TRACE);
     }
 
     @Override
     public void trace(@NotNull final Marker marker, @NotNull final String message) {
-        log(Level.TRACE,marker,message);
+        log(Level.TRACE, marker, message);
     }
 
     @Override
     public void trace(@NotNull final Marker marker, String message, @NotNull final Object arg) {
-        trace(marker,format(message,arg));
+        trace(marker, format(message, arg));
     }
 
     @Override
     public void trace(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        trace(marker,format(message,arg1,arg2));
+        trace(marker, format(message, arg1, arg2));
     }
 
     @Override
     public void trace(@NotNull final Marker marker, String message, Object... args) {
-        trace(marker,format(message,args));
+        trace(marker, format(message, args));
     }
 
     @Override
     public void trace(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
-        trace(marker,format(message,t));
+        trace(marker, format(message, t));
     }
 
     /**
      * Check if log calls to Log Level {@link Level#DEBUG} will be logged or ignored.
+     *
      * @return True | False
      */
     @Override
@@ -280,66 +310,68 @@ public class Logger implements org.slf4j.Logger {
 
     @Override
     public void debug(@NotNull final String message) {
-        log(Level.DEBUG,message);
+        log(Level.DEBUG, message);
     }
 
     @Override
     public void debug(@NotNull final String message, @NotNull final Object arg) {
-        debug(format(message,arg));
+        debug(format(message, arg));
     }
 
     @Override
     public void debug(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        debug(format(message,arg1,arg2));
+        debug(format(message, arg1, arg2));
     }
 
     @Override
     public void debug(@NotNull final String message, @NotNull final Object... args) {
-        debug(format(message,args));
+        debug(format(message, args));
     }
 
     @Override
     public void debug(@NotNull final String message, @NotNull final Throwable t) {
-        debug(format(message,t));
+        debug(format(message, t));
     }
 
     /**
      * Check if log calls to Log Level {@link Level#DEBUG} with the given {@link Marker} will be logged or ignored.
+     *
      * @return True, if the current Log Level is of Level Debug, or if the Marker is a registered forced marker.
      * @see Logger#registerForcedMarker(Marker)
      */
     @Override
     public boolean isDebugEnabled(@NotNull final Marker marker) {
-        return isLoggable(marker,Level.DEBUG);
+        return isLoggable(marker, Level.DEBUG);
     }
 
     @Override
     public void debug(@NotNull final Marker marker, @NotNull final String message) {
-        log(Level.DEBUG,marker,message);
+        log(Level.DEBUG, marker, message);
     }
 
     @Override
     public void debug(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        debug(marker,format(message,arg));
+        debug(marker, format(message, arg));
     }
 
     @Override
     public void debug(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        debug(marker,format(message,arg1,arg2));
+        debug(marker, format(message, arg1, arg2));
     }
 
     @Override
     public void debug(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... args) {
-        debug(marker,format(message,args));
+        debug(marker, format(message, args));
     }
 
     @Override
     public void debug(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        debug(marker,format(message,t));
+        debug(marker, format(message, t));
     }
 
     /**
      * Check if log calls to Log Level {@link Level#INFO} will be logged or ignored.
+     *
      * @return True | False
      */
     @Override
@@ -349,66 +381,68 @@ public class Logger implements org.slf4j.Logger {
 
     @Override
     public void info(@NotNull final String message) {
-        log(Level.INFO,message);
+        log(Level.INFO, message);
     }
 
     @Override
     public void info(@NotNull final String message, @NotNull final Object arg) {
-        info(format(message,arg));
+        info(format(message, arg));
     }
 
     @Override
     public void info(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        info(format(message,arg1,arg2));
+        info(format(message, arg1, arg2));
     }
 
     @Override
     public void info(@NotNull final String message, @NotNull final Object... arguments) {
-        info(format(message,arguments));
+        info(format(message, arguments));
     }
 
     @Override
     public void info(@NotNull final String message, @NotNull final Throwable t) {
-        info(format(message,t));
+        info(format(message, t));
     }
 
     /**
      * Check if log calls to Log Level {@link Level#INFO} with the given {@link Marker} will be logged or ignored.
+     *
      * @return True, if the current Log Level is of Level Info, or if the Marker is a registered forced marker.
      * @see Logger#registerForcedMarker(Marker)
      */
     @Override
     public boolean isInfoEnabled(@NotNull final Marker marker) {
-        return isLoggable(marker,Level.INFO);
+        return isLoggable(marker, Level.INFO);
     }
 
     @Override
     public void info(@NotNull final Marker marker, @NotNull final String message) {
-        log(Level.INFO,marker,message);
+        log(Level.INFO, marker, message);
     }
 
     @Override
     public void info(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        info(marker,format(message,arg));
+        info(marker, format(message, arg));
     }
 
     @Override
     public void info(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        info(marker,format(message,arg1,arg2));
+        info(marker, format(message, arg1, arg2));
     }
 
     @Override
     public void info(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... arguments) {
-        info(marker,format(message,arguments));
+        info(marker, format(message, arguments));
     }
 
     @Override
     public void info(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        info(marker,format(message,t));
+        info(marker, format(message, t));
     }
 
     /**
      * Check if log calls to Log Level {@link Level#WARNING} will be logged or ignored.
+     *
      * @return True | False
      */
     @Override
@@ -418,66 +452,68 @@ public class Logger implements org.slf4j.Logger {
 
     @Override
     public void warn(@NotNull final String message) {
-        log(Level.WARNING,message);
+        log(Level.WARNING, message);
     }
 
     @Override
     public void warn(@NotNull final String message, @NotNull final Object arg) {
-        warn(format(message,arg));
+        warn(format(message, arg));
     }
 
     @Override
     public void warn(@NotNull final String message, @NotNull final Object... arguments) {
-        warn(format(message,arguments));
+        warn(format(message, arguments));
     }
 
     @Override
     public void warn(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        warn(format(message,arg1,arg2));
+        warn(format(message, arg1, arg2));
     }
 
     @Override
     public void warn(@NotNull final String message, @NotNull final Throwable t) {
-        warn(format(message,t));
+        warn(format(message, t));
     }
 
     /**
      * Check if log calls to Log Level {@link Level#WARNING} with the given {@link Marker} will be logged or ignored.
+     *
      * @return True, if the current Log Level is of Level Warning, or if the Marker is a registered forced marker.
      * @see Logger#registerForcedMarker(Marker)
      */
     @Override
     public boolean isWarnEnabled(@NotNull final Marker marker) {
-        return isLoggable(marker,Level.WARNING);
+        return isLoggable(marker, Level.WARNING);
     }
 
     @Override
     public void warn(@NotNull final Marker marker, @NotNull final String message) {
-        log(Level.WARNING,marker,message);
+        log(Level.WARNING, marker, message);
     }
 
     @Override
     public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        warn(marker,format(message,arg));
+        warn(marker, format(message, arg));
     }
 
     @Override
     public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        warn(marker,format(message,arg1,arg2));
+        warn(marker, format(message, arg1, arg2));
     }
 
     @Override
     public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... arguments) {
-        warn(marker,format(message,arguments));
+        warn(marker, format(message, arguments));
     }
 
     @Override
     public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        warn(marker,format(message,t));
+        warn(marker, format(message, t));
     }
 
     /**
      * Check if log calls to Log Level {@link Level#ERROR} will be logged or ignored.
+     *
      * @return True | False
      */
     @Override
@@ -487,67 +523,68 @@ public class Logger implements org.slf4j.Logger {
 
     @Override
     public void error(@NotNull final String message) {
-        log(Level.ERROR,message);
+        log(Level.ERROR, message);
     }
 
     @Override
     public void error(@NotNull final String message, @NotNull final Object arg) {
-        error(format(message,arg));
+        error(format(message, arg));
     }
 
     @Override
     public void error(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        error(format(message,arg1,arg2));
+        error(format(message, arg1, arg2));
     }
 
     @Override
     public void error(@NotNull final String message, @NotNull final Object... arguments) {
-        error(format(message,arguments));
+        error(format(message, arguments));
     }
 
     @Override
     public void error(@NotNull final String message, @NotNull final Throwable t) {
-        error(format(message,t));
+        error(format(message, t));
     }
 
     /**
      * Check if log calls to Log Level {@link Level#ERROR} with the given {@link Marker} will be logged or ignored.
+     *
      * @return True, if the current Log Level is of Level Error, or if the Marker is a registered forced marker.
      * @see Logger#registerForcedMarker(Marker)
      */
     @Override
     public boolean isErrorEnabled(@NotNull final Marker marker) {
-        return isLoggable(marker,Level.ERROR);
+        return isLoggable(marker, Level.ERROR);
     }
 
     @Override
     public void error(@NotNull final Marker marker, @NotNull final String message) {
-        log(Level.ERROR,marker,message);
+        log(Level.ERROR, marker, message);
     }
 
     @Override
     public void error(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        error(marker,format(message,arg));
+        error(marker, format(message, arg));
     }
 
     @Override
     public void error(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        error(marker,format(message,arg1,arg2));
+        error(marker, format(message, arg1, arg2));
     }
 
     @Override
     public void error(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... arguments) {
-        error(marker,format(message,arguments));
+        error(marker, format(message, arguments));
     }
 
     @Override
     public void error(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        error(marker,format(message,t));
+        error(marker, format(message, t));
     }
 
     @NotNull
     private static String format(@NotNull final String log, @NotNull final Object... args) {
-        String message = log.replace("%s","{}").replace("%d","{}");
+        String message = log.replace("%s", "{}").replace("%d", "{}");
         for (final Object arg : args) {
             switch (arg) {
                 case Throwable t -> {
@@ -568,7 +605,7 @@ public class Logger implements org.slf4j.Logger {
                     builder.append(" ]");
                     message = message.replaceFirst("\\{}", Matcher.quoteReplacement(builder.toString()));
                 }
-                case Map<?,?> m -> {
+                case Map<?, ?> m -> {
                     final StringBuilder builder = new StringBuilder();
                     builder.append("{");
                     for (final var index : m.entrySet()) {
