@@ -1,28 +1,30 @@
 package dev.prodzeus.logger;
 
+import dev.prodzeus.logger.event.EventHandler;
+import dev.prodzeus.logger.event.EventListener;
+import dev.prodzeus.logger.event.EventManager;
+import dev.prodzeus.logger.event.exception.EventException;
+import dev.prodzeus.logger.event.log.*;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Marker;
 
 import java.util.*;
-import java.util.function.Consumer;
 import java.util.regex.Matcher;
 
 /**
- * A simple logger with SLF4J implementation.
+ * A simple logger with SLF4J implementation and an Event Listening system inspired by Bukkit.
  *
  * @author prodzeus
  * @apiNote SLF4J Version: <b>2.0.12</b>
  */
-@SuppressWarnings("unused")
-public class Logger implements org.slf4j.Logger {
+public final class Logger implements org.slf4j.Logger {
 
     private final String name;
     private final String loggerName;
     private Level level;
     private final Set<Marker> forcedMarkers = new HashSet<>();
-    private final Set<Consumer<String>> consumer = new HashSet<>();
-    private boolean alwaysRunConsumers = false;
 
     /**
      * Constructs a new Logger instance.
@@ -31,11 +33,23 @@ public class Logger implements org.slf4j.Logger {
      * @apiNote <b>This should only be called through the LoggerFactory!</b>
      * @see LoggerFactory#getLogger(String)
      */
-    public Logger(final String name) {
+    public Logger(@NotNull final String name) {
         this.name = name;
-        this.loggerName = " \u001b[38;5;240m[\u001b[0m" + name + "\u001b[38;5;240m]\u001b[0m ";
+        this.loggerName = "\u001b[38;5;240m[\u001b[0m" + name + "\u001b[38;5;240m]\u001b[0m";
+        EventManager.registerListener(new DefaultListener(),this);
         setLevel(Level.INFO);
         info("\u001b[38;5;46mNew Logger instance created.");
+    }
+
+    public Logger(@NotNull final Class<?> clazz) {
+        this(clazz.getName());
+    }
+
+    public static class DefaultListener implements EventListener {
+        @EventHandler
+        public void onLogEvent(@NotNull final GenericLogEvent event) {
+            System.out.println(event.getFormattedLog());
+        }
     }
 
     /**
@@ -90,9 +104,8 @@ public class Logger implements org.slf4j.Logger {
      * @return The current Level.
      * @see Logger#registerForcedMarker(Marker)
      */
-    @NotNull
     @Contract(pure = true)
-    public Level getLevel() {
+    public @NotNull Level getLevel() {
         return level;
     }
 
@@ -104,7 +117,7 @@ public class Logger implements org.slf4j.Logger {
      */
     @Contract(pure = true)
     public boolean isLoggable(@NotNull final Level level) {
-        return this.level.getWeight() <= level.getWeight();
+        return isLoggable(level, null);
     }
 
     /**
@@ -117,104 +130,9 @@ public class Logger implements org.slf4j.Logger {
      * @see Logger#registerForcedMarker(Marker)
      */
     @Contract(pure = true)
-    public boolean isLoggable(@NotNull final Marker marker, final Level level) {
-        if (forcedMarkers.contains(marker)) return true;
-        return isLoggable(level);
-    }
-
-    private synchronized void runConsumers(@NotNull final String log) {
-        for (final Consumer<String> c : consumer) {
-            try {
-                c.accept(log);
-            } catch (final Exception e) {
-                System.out.println(Level.ERROR.getPrefix() + "dev.prodzeus.logger" + Level.ERROR.getColor() + "Exception caught while running consumer! " + e.getMessage());
-            }
-        }
-
-    }
-
-    private void log(@NotNull final Level level, @NotNull final String message, @NotNull final String consumerMessage) {
-        if (isLoggable(level)) System.out.println(message);
-        if (isLoggable(level) || alwaysRunConsumers) runConsumers(consumerMessage);
-    }
-
-    private void log(@NotNull final Level level, @NotNull final String message) {
-        log(level,
-                level.getPrefix() + loggerName + level.getColor() + message,
-                "[" + level + "] " + name + " " + message);
-    }
-
-    private void log(@NotNull final Level level, @NotNull final Marker marker, @NotNull final String message) {
-        log(level,
-                level.getPrefix() + "[" + marker.getName() + "]" + loggerName + level.getColor() + message,
-                "[" + level + "]" + " [" + marker.getName() + "] " + name + " " + message);
-    }
-
-    /**
-     * Whether consumers should ignore the Log Level.
-     * Setting this to true will ensure that consumers are always passed the log,
-     * regardless of the current Log Level.
-     *
-     * @param enable True | False
-     * @return The Logger instance.
-     */
-    public Logger alwaysRunConsumers(final boolean enable) {
-        this.alwaysRunConsumers = enable;
-        return this;
-    }
-
-    /**
-     * Add a consumer to the Logger.
-     * Any log call will be passed to all registered consumers.
-     *
-     * @param consumer New consumer to add.
-     * @return The Logger instance.
-     */
-    public Logger registerConsumer(@NotNull final Consumer<String> consumer) {
-        this.consumer.add(consumer);
-        return this;
-    }
-
-    /**
-     * Add consumers to the Logger.
-     * Any log call will be passed to all registered consumers.
-     *
-     * @param consumers New consumers to add.
-     * @return The Logger instance.
-     */
-    public final Logger registerConsumer(@NotNull final Consumer<String>... consumers) {
-        for (final Consumer<String> c : consumers) registerConsumer(c);
-        return this;
-    }
-
-    /**
-     * Unregister a consumer from the Logger.
-     *
-     * @param consumer Consumer to unregister.
-     * @return The Logger instance.
-     */
-    public Logger unregisterConsumer(@NotNull final Consumer<String> consumer) {
-        this.consumer.remove(consumer);
-        return this;
-    }
-
-    /**
-     * Get all registered consumers.
-     *
-     * @return All registered consumers, or an empty set if no consumers have been registered.
-     */
-    public Set<Consumer<String>> getConsumers() {
-        return consumer;
-    }
-
-    /**
-     * Clear all registered Consumers.
-     *
-     * @return The Logger instance.
-     */
-    public Logger clearConsumers() {
-        this.consumer.clear();
-        return this;
+    public boolean isLoggable(final Level level, @Nullable final Marker marker) {
+        if (marker != null && forcedMarkers.contains(marker)) return true;
+        return this.level.getWeight() <= level.getWeight();
     }
 
     /**
@@ -222,8 +140,9 @@ public class Logger implements org.slf4j.Logger {
      *
      * @return The name.
      */
+    @Contract(pure = true)
     @Override
-    public String getName() {
+    public @NotNull String getName() {
         return name;
     }
 
@@ -232,6 +151,7 @@ public class Logger implements org.slf4j.Logger {
      *
      * @return True | False
      */
+    @Contract(pure = true)
     @Override
     public boolean isTraceEnabled() {
         return isLoggable(Level.TRACE);
@@ -239,27 +159,31 @@ public class Logger implements org.slf4j.Logger {
 
     @Override
     public void trace(@NotNull final String message) {
-        log(Level.TRACE, message);
+        new TraceLogEvent(this,message);
     }
 
     @Override
     public void trace(@NotNull String message, @NotNull final Object arg) {
-        trace(format(message, arg));
+        new TraceLogEvent(this,format(message, arg),arg);
     }
 
     @Override
     public void trace(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
-        trace(format(message, arg1, arg2));
+        new TraceLogEvent(this,format(message, arg1,arg2),arg1,arg2);
     }
 
     @Override
     public void trace(@NotNull String message, @NotNull final Object... args) {
-        trace(format(message, args));
+        new TraceLogEvent(this,format(message, args),args);
     }
 
     @Override
     public void trace(@NotNull String message, @NotNull final Throwable t) {
-        trace(format(message, t));
+        new TraceLogEvent(this,format(message, t),t);
+    }
+
+    public void trace(@NotNull String message, @NotNull final EventException e) {
+        new TraceLogEvent(this,format(message, e),e);
     }
 
     /**
@@ -268,34 +192,39 @@ public class Logger implements org.slf4j.Logger {
      * @return True, if the current Log Level is of Level Trace, or if the Marker is a registered forced marker.
      * @see Logger#registerForcedMarker(Marker)
      */
+    @Contract(pure = true)
     @Override
     public boolean isTraceEnabled(@NotNull final Marker marker) {
-        return isLoggable(marker, Level.TRACE);
+        return isLoggable(Level.TRACE,marker);
     }
 
     @Override
     public void trace(@NotNull final Marker marker, @NotNull final String message) {
-        log(Level.TRACE, marker, message);
+        new TraceLogEvent(this,marker,message);
     }
 
     @Override
-    public void trace(@NotNull final Marker marker, String message, @NotNull final Object arg) {
-        trace(marker, format(message, arg));
+    public void trace(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
+        new TraceLogEvent(this,marker,format(message,arg),arg);
     }
 
     @Override
     public void trace(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        trace(marker, format(message, arg1, arg2));
+        new TraceLogEvent(this,marker,format(message,arg1,arg2),arg1,arg2);
     }
 
     @Override
     public void trace(@NotNull final Marker marker, String message, Object... args) {
-        trace(marker, format(message, args));
+        new TraceLogEvent(this,marker,format(message,args),args);
     }
 
     @Override
     public void trace(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
-        trace(marker, format(message, t));
+        new TraceLogEvent(this,marker,format(message,t),t);
+    }
+
+    public void trace(@NotNull final Marker marker, String message, @NotNull final EventException e) {
+        new TraceLogEvent(this,marker,format(message,e),e);
     }
 
     /**
@@ -303,6 +232,7 @@ public class Logger implements org.slf4j.Logger {
      *
      * @return True | False
      */
+    @Contract(pure = true)
     @Override
     public boolean isDebugEnabled() {
         return isLoggable(Level.DEBUG);
@@ -310,27 +240,31 @@ public class Logger implements org.slf4j.Logger {
 
     @Override
     public void debug(@NotNull final String message) {
-        log(Level.DEBUG, message);
+        new DebugLogEvent(this,message);
     }
 
     @Override
     public void debug(@NotNull final String message, @NotNull final Object arg) {
-        debug(format(message, arg));
+        new DebugLogEvent(this,format(message,arg),arg);
     }
 
     @Override
     public void debug(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        debug(format(message, arg1, arg2));
+        new DebugLogEvent(this,format(message,arg1,arg2),arg1,arg2);
     }
 
     @Override
     public void debug(@NotNull final String message, @NotNull final Object... args) {
-        debug(format(message, args));
+        new DebugLogEvent(this,format(message,args),args);
     }
 
     @Override
     public void debug(@NotNull final String message, @NotNull final Throwable t) {
-        debug(format(message, t));
+        new DebugLogEvent(this,format(message,t),t);
+    }
+
+    public void debug(@NotNull final String message, @NotNull final EventException e) {
+        new DebugLogEvent(this,format(message,e),e);
     }
 
     /**
@@ -339,34 +273,39 @@ public class Logger implements org.slf4j.Logger {
      * @return True, if the current Log Level is of Level Debug, or if the Marker is a registered forced marker.
      * @see Logger#registerForcedMarker(Marker)
      */
+    @Contract(pure = true)
     @Override
     public boolean isDebugEnabled(@NotNull final Marker marker) {
-        return isLoggable(marker, Level.DEBUG);
+        return isLoggable(Level.DEBUG,marker);
     }
 
     @Override
     public void debug(@NotNull final Marker marker, @NotNull final String message) {
-        log(Level.DEBUG, marker, message);
+        new DebugLogEvent(this,marker,message);
     }
 
     @Override
     public void debug(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        debug(marker, format(message, arg));
+        new DebugLogEvent(this,marker,format(message,arg),arg);
     }
 
     @Override
     public void debug(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        debug(marker, format(message, arg1, arg2));
+        new DebugLogEvent(this,marker,format(message,arg1,arg2),arg1,arg2);
     }
 
     @Override
     public void debug(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... args) {
-        debug(marker, format(message, args));
+        new DebugLogEvent(this,marker,format(message,args),args);
     }
 
     @Override
     public void debug(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        debug(marker, format(message, t));
+        new DebugLogEvent(this,marker,format(message,t),t);
+    }
+
+    public void debug(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
+        new DebugLogEvent(this,marker,format(message,e),e);
     }
 
     /**
@@ -374,6 +313,7 @@ public class Logger implements org.slf4j.Logger {
      *
      * @return True | False
      */
+    @Contract(pure = true)
     @Override
     public boolean isInfoEnabled() {
         return isLoggable(Level.INFO);
@@ -381,27 +321,31 @@ public class Logger implements org.slf4j.Logger {
 
     @Override
     public void info(@NotNull final String message) {
-        log(Level.INFO, message);
+        new InfoLogEvent(this,message);
     }
 
     @Override
     public void info(@NotNull final String message, @NotNull final Object arg) {
-        info(format(message, arg));
+        new InfoLogEvent(this,format(message,arg),arg);
     }
 
     @Override
     public void info(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        info(format(message, arg1, arg2));
+        new InfoLogEvent(this,format(message,arg1,arg2),arg1,arg2);
     }
 
     @Override
-    public void info(@NotNull final String message, @NotNull final Object... arguments) {
-        info(format(message, arguments));
+    public void info(@NotNull final String message, @NotNull final Object... args) {
+        new InfoLogEvent(this,format(message,args),args);
     }
 
     @Override
     public void info(@NotNull final String message, @NotNull final Throwable t) {
-        info(format(message, t));
+        new InfoLogEvent(this,format(message,t),t);
+    }
+
+    public void info(@NotNull final String message, @NotNull final EventException e) {
+        new InfoLogEvent(this,format(message,e),e);
     }
 
     /**
@@ -410,34 +354,39 @@ public class Logger implements org.slf4j.Logger {
      * @return True, if the current Log Level is of Level Info, or if the Marker is a registered forced marker.
      * @see Logger#registerForcedMarker(Marker)
      */
+    @Contract(pure = true)
     @Override
     public boolean isInfoEnabled(@NotNull final Marker marker) {
-        return isLoggable(marker, Level.INFO);
+        return isLoggable(Level.INFO,marker);
     }
 
     @Override
     public void info(@NotNull final Marker marker, @NotNull final String message) {
-        log(Level.INFO, marker, message);
+        new InfoLogEvent(this,marker,message);
     }
 
     @Override
     public void info(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        info(marker, format(message, arg));
+        new InfoLogEvent(this,marker,format(message,arg),arg);
     }
 
     @Override
     public void info(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        info(marker, format(message, arg1, arg2));
+        new InfoLogEvent(this,marker,format(message,arg1,arg2),arg1,arg2);
     }
 
     @Override
-    public void info(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... arguments) {
-        info(marker, format(message, arguments));
+    public void info(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... args) {
+        new InfoLogEvent(this,marker,format(message,args),args);
     }
 
     @Override
     public void info(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        info(marker, format(message, t));
+        new InfoLogEvent(this,marker,format(message,t),t);
+    }
+
+    public void info(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
+        new InfoLogEvent(this,marker,format(message,e),e);
     }
 
     /**
@@ -445,34 +394,68 @@ public class Logger implements org.slf4j.Logger {
      *
      * @return True | False
      */
+    @Contract(pure = true)
     @Override
     public boolean isWarnEnabled() {
         return isLoggable(Level.WARNING);
     }
 
+    @Contract(pure = true)
+    public boolean isWarningEnabled() {
+        return isWarnEnabled();
+    }
+
     @Override
     public void warn(@NotNull final String message) {
-        log(Level.WARNING, message);
+        new WarningLogEvent(this,message);
+    }
+
+    public void warning(@NotNull final String message) {
+        warn(message);
     }
 
     @Override
     public void warn(@NotNull final String message, @NotNull final Object arg) {
-        warn(format(message, arg));
+        new WarningLogEvent(this,format(message, arg),arg);
+    }
+
+    public void warning(@NotNull final String message, @NotNull final Object arg) {
+        warn(message, arg);
     }
 
     @Override
-    public void warn(@NotNull final String message, @NotNull final Object... arguments) {
-        warn(format(message, arguments));
+    public void warn(@NotNull final String message, @NotNull final Object... args) {
+        new WarningLogEvent(this,format(message, args),args);
+    }
+
+    public void warning(@NotNull final String message, @NotNull final Object... arguments) {
+        warn(message, arguments);
     }
 
     @Override
     public void warn(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        warn(format(message, arg1, arg2));
+        new WarningLogEvent(this,format(message, arg1,arg2),arg1,arg2);
+    }
+
+    public void warning(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
+        warn(message, arg1, arg2);
     }
 
     @Override
     public void warn(@NotNull final String message, @NotNull final Throwable t) {
-        warn(format(message, t));
+        new WarningLogEvent(this,format(message, t),t);
+    }
+
+    public void warning(@NotNull final String message, @NotNull final Throwable t) {
+        warn(message, t);
+    }
+
+    public void warn(@NotNull final String message, @NotNull final EventException e) {
+        new WarningLogEvent(this,format(message, e),e);
+    }
+
+    public void warning(@NotNull final String message, @NotNull final EventException e) {
+        warn(message, e);
     }
 
     /**
@@ -481,34 +464,68 @@ public class Logger implements org.slf4j.Logger {
      * @return True, if the current Log Level is of Level Warning, or if the Marker is a registered forced marker.
      * @see Logger#registerForcedMarker(Marker)
      */
+    @Contract(pure = true)
     @Override
     public boolean isWarnEnabled(@NotNull final Marker marker) {
-        return isLoggable(marker, Level.WARNING);
+        return isLoggable(Level.WARNING,marker);
+    }
+
+    @Contract(pure = true)
+    public boolean isWarningEnabled(@NotNull final Marker marker) {
+        return isWarnEnabled(marker);
     }
 
     @Override
     public void warn(@NotNull final Marker marker, @NotNull final String message) {
-        log(Level.WARNING, marker, message);
+        new WarningLogEvent(this,marker,message);
+    }
+
+    public void warning(@NotNull final Marker marker, @NotNull final String message) {
+        warn(marker, message);
     }
 
     @Override
     public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        warn(marker, format(message, arg));
+        new WarningLogEvent(this,marker,format(message, arg),arg);
+    }
+
+    public void warning(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
+        warn(marker, message, arg);
     }
 
     @Override
     public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        warn(marker, format(message, arg1, arg2));
+        new WarningLogEvent(this,marker,format(message, arg1,arg2),arg1,arg2);
+    }
+
+    public void warning(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
+        warn(marker, message, arg1, arg2);
     }
 
     @Override
-    public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... arguments) {
-        warn(marker, format(message, arguments));
+    public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... args) {
+        new WarningLogEvent(this,marker,format(message, args),args);
+    }
+
+    public void warning(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... arguments) {
+        warn(marker, message, arguments);
     }
 
     @Override
     public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        warn(marker, format(message, t));
+        new WarningLogEvent(this,marker,format(message, t),t);
+    }
+
+    public void warning(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
+        warn(marker, message, t);
+    }
+
+    public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
+        new WarningLogEvent(this,marker,format(message, e),e);
+    }
+
+    public void warning(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
+        warn(marker, message, e);
     }
 
     /**
@@ -516,6 +533,7 @@ public class Logger implements org.slf4j.Logger {
      *
      * @return True | False
      */
+    @Contract(pure = true)
     @Override
     public boolean isErrorEnabled() {
         return isLoggable(Level.ERROR);
@@ -523,27 +541,31 @@ public class Logger implements org.slf4j.Logger {
 
     @Override
     public void error(@NotNull final String message) {
-        log(Level.ERROR, message);
+        new ErrorLogEvent(this,message);
     }
 
     @Override
     public void error(@NotNull final String message, @NotNull final Object arg) {
-        error(format(message, arg));
+        new ErrorLogEvent(this,format(message,arg),arg);
     }
 
     @Override
     public void error(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        error(format(message, arg1, arg2));
+        new ErrorLogEvent(this,format(message,arg1,arg2),arg1,arg2);
     }
 
     @Override
-    public void error(@NotNull final String message, @NotNull final Object... arguments) {
-        error(format(message, arguments));
+    public void error(@NotNull final String message, @NotNull final Object... args) {
+        new ErrorLogEvent(this,format(message,args),args);
     }
 
     @Override
     public void error(@NotNull final String message, @NotNull final Throwable t) {
-        error(format(message, t));
+        new ErrorLogEvent(this,format(message,t),t);
+    }
+
+    public void error(@NotNull final String message, @NotNull final EventException e) {
+        new ErrorLogEvent(this,format(message,e),e);
     }
 
     /**
@@ -552,41 +574,53 @@ public class Logger implements org.slf4j.Logger {
      * @return True, if the current Log Level is of Level Error, or if the Marker is a registered forced marker.
      * @see Logger#registerForcedMarker(Marker)
      */
+    @Contract(pure = true)
     @Override
     public boolean isErrorEnabled(@NotNull final Marker marker) {
-        return isLoggable(marker, Level.ERROR);
+        return isLoggable(Level.ERROR,marker);
     }
 
     @Override
     public void error(@NotNull final Marker marker, @NotNull final String message) {
-        log(Level.ERROR, marker, message);
+        new ErrorLogEvent(this,marker,message);
     }
 
     @Override
     public void error(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        error(marker, format(message, arg));
+        new ErrorLogEvent(this,marker,format(message,arg),arg);
     }
 
     @Override
     public void error(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        error(marker, format(message, arg1, arg2));
+        new ErrorLogEvent(this,marker,format(message,arg1,arg2),arg1,arg2);
     }
 
     @Override
-    public void error(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... arguments) {
-        error(marker, format(message, arguments));
+    public void error(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... args) {
+        new ErrorLogEvent(this,marker,format(message,args),args);
     }
 
     @Override
     public void error(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        error(marker, format(message, t));
+        new ErrorLogEvent(this,marker,format(message,t),t);
     }
 
-    @NotNull
-    private static String format(@NotNull final String log, @NotNull final Object... args) {
+    public void error(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
+        new ErrorLogEvent(this,marker,format(message,e),e);
+    }
+
+    @Contract(pure = true)
+    private static @NotNull String format(@NotNull final String log, @NotNull final Object... args) {
         String message = log.replace("%s", "{}").replace("%d", "{}");
         for (final Object arg : args) {
             switch (arg) {
+                case EventException e -> {
+                    final StringBuilder builder = new StringBuilder();
+                    for (final StackTraceElement st : e.getStackTrace()) {
+                        builder.append(Level.ERROR.getColor()).append(st.toString()).append("\n");
+                    }
+                    message = message.replaceFirst("\\{}", Matcher.quoteReplacement(builder.toString()));
+                }
                 case Throwable t -> {
                     final StringBuilder builder = new StringBuilder();
                     for (final StackTraceElement st : t.getStackTrace()) {
