@@ -7,7 +7,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 
-public class TraceLogEvent extends GenericLogEvent {
+public final class TraceLogEvent extends GenericLogEvent {
 
     public TraceLogEvent(@NotNull final Logger logger, @NotNull final Collection<Marker> marker, @NotNull final String log, @NotNull final Collection<Object> args) {
         super(logger, Level.TRACE, marker, log, args);

@@ -15,11 +15,7 @@ import java.util.concurrent.Executors;
 
 public abstract class Event {
 
-    private static final ExecutorService threadPool;
-
-    static {
-        threadPool = Executors.newVirtualThreadPerTaskExecutor();
-    }
+    private static final ExecutorService threadPool = Executors.newVirtualThreadPerTaskExecutor();
 
     protected final Logger logger;
     protected final Collection<RegisteredListener> listeners = new HashSet<>();
@@ -30,11 +26,16 @@ public abstract class Event {
         this.logger = logger;
     }
 
+    @SneakyThrows
     protected boolean fireEvent(@NotNull final Event event) {
         listeners.addAll(EventManager.getHandlers(event));
         if (listeners.isEmpty()) return false;
         for (final RegisteredListener listener : listeners) {
-            listener.accept(event);
+            try {
+                listener.accept(event);
+            } catch (EventException e) {
+                new ExceptionEvent(e);
+            }
         }
         return true;
     }
@@ -47,13 +48,19 @@ public abstract class Event {
         listeners.addAll(EventManager.getHandlers(event));
         if (listeners.isEmpty()) return false;
         for (final RegisteredListener listener : listeners) {
-            threadPool.submit(() -> listener.accept(event));
+            threadPool.submit(() -> {
+                try {
+                    listener.accept(event);
+                } catch (EventException e) {
+                    e.printStackTrace();
+                }
+            });
         }
         return true;
     }
 
     public interface Executor {
-        void execute(EventListener listener, Event event);
+        void execute(EventListener listener, Event event) throws EventException;
     }
 
     public String getCaller() {

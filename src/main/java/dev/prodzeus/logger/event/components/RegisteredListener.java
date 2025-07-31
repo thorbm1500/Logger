@@ -1,8 +1,8 @@
 package dev.prodzeus.logger.event.components;
 
 import dev.prodzeus.logger.Logger;
-import dev.prodzeus.logger.SLF4JProvider;
 import dev.prodzeus.logger.event.Event;
+import dev.prodzeus.logger.event.events.exception.ExceptionEvent;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.Method;
@@ -10,7 +10,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
-public class RegisteredListener {
+public final class RegisteredListener {
 
     private final Logger logger;
     private final EventListener listener;
@@ -36,13 +36,13 @@ public class RegisteredListener {
         return events;
     }
 
-    public void accept(@NotNull final Event event) {
+    public void accept(@NotNull final Event event)throws EventException {
         for (final Event.Executor executor : executors) {
             executor.execute(listener,event);
         }
     }
 
-    public static @NotNull RegisteredListener createNewListener(@NotNull final EventListener listener, @NotNull final Logger logger) throws EventException {
+    public static @NotNull RegisteredListener createNewListener(@NotNull final EventListener listener, @NotNull final Logger logger) throws Exception {
         final HashSet<Method> methods = HashSet.newHashSet(4);
         try {
             final Method[] definedMethods = listener.getClass().getMethods();
@@ -53,7 +53,7 @@ public class RegisteredListener {
                 methods.add(method);
             }
         } catch (Exception e) {
-            throw new EventException(new RuntimeException(e));
+            new ExceptionEvent(e);
         }
 
         if (methods.isEmpty()) throw new EventException(new IllegalStateException("No methods found!"));
@@ -62,12 +62,14 @@ public class RegisteredListener {
         final HashSet<Event.Executor> executors = HashSet.newHashSet(4);
         for (final Method method : methods) {
             if (method == null) throw new EventException(new IllegalStateException("Method is null!"));
+
             final EventHandler eventHandler = method.getAnnotation(EventHandler.class);
             if (eventHandler == null) continue;
 
             if (method.getParameterCount() != 1) {
                 throw new EventException(new IllegalStateException("Method %s must have exactly one parameter!".formatted(method.getName())));
             }
+
             final Class<?> clazz;
             if (!Event.class.isAssignableFrom(clazz = method.getParameterTypes()[0])) {
                 throw new EventException(new IllegalStateException("Method %s must implement a valid Event!".formatted(method.getName())));
@@ -81,7 +83,7 @@ public class RegisteredListener {
                 try {
                     method.invoke(l, e);
                 } catch (Exception ex) {
-                    SLF4JProvider.getSystem().error("Exception while executing event method {}: {}", method.getName(), ex);
+                    new ExceptionEvent(ex);
                 }
             });
 

@@ -5,7 +5,7 @@ import lombok.SneakyThrows;
 
 import java.io.Serial;
 
-public class EventException extends Exception {
+public final class EventException extends Exception {
 
     @Serial
     private static final long serialVersionUID = 1L;

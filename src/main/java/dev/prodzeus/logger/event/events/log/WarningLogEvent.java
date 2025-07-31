@@ -9,7 +9,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
 
-public class WarningLogEvent extends GenericLogEvent {
+public final class WarningLogEvent extends GenericLogEvent {
 
     public WarningLogEvent(@NotNull final Logger logger, @NotNull final Collection<Marker> marker, @NotNull final String log, @NotNull final Collection<Object> args) {
         super(logger, Level.WARNING, marker, log, args);

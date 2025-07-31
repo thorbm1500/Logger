@@ -1,12 +1,15 @@
 package dev.prodzeus.logger;
 
 import dev.prodzeus.logger.event.EventManager;
+import dev.prodzeus.logger.event.components.EventException;
 import dev.prodzeus.logger.event.components.EventListener;
 import org.slf4j.spi.SLF4JServiceProvider;
 
-public class SLF4JProvider implements SLF4JServiceProvider {
+public final class SLF4JProvider implements SLF4JServiceProvider {
 
     private static SLF4JProvider instance;
+    private final MarkerFactory markerFactory = new MarkerFactory();
+    private final MDCAdapter adapter = new MDCAdapter();
 
     /**
      * @apiNote It's recommended to use {@link SLF4JProvider#getInstance()},
@@ -25,9 +28,6 @@ public class SLF4JProvider implements SLF4JServiceProvider {
     public static synchronized Logger getSystem() {
         return getInstance().getLoggerFactory().getLogger("dev.prodzeus.logger");
     }
-
-    private final MarkerFactory markerFactory = new MarkerFactory();
-    private final MDCAdapter adapter = new MDCAdapter();
 
     @Override
     public LoggerFactory getLoggerFactory() {
@@ -59,7 +59,7 @@ public class SLF4JProvider implements SLF4JServiceProvider {
         getSystem().info("SLF4JProvider initialized.");
     }
 
-    public boolean registerListener(final EventListener listener, final Logger logger) {
+    public boolean registerListener(final EventListener listener, final Logger logger) throws EventException {
         if (EventManager.registerListener(listener,logger)) {
             getSystem().info("New Event Listener registered for {}.", logger.getName());
             return true;

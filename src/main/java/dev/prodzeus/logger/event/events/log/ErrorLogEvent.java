@@ -9,7 +9,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Set;
 
-public class ErrorLogEvent extends GenericLogEvent {
+public final class ErrorLogEvent extends GenericLogEvent {
 
     public ErrorLogEvent(@NotNull final Logger logger, @NotNull final Collection<Marker> marker, @NotNull final String log, @NotNull final Collection<Object> args) {
         super(logger, Level.ERROR, marker, log, args);

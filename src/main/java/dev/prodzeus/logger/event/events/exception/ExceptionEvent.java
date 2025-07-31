@@ -10,13 +10,13 @@ public final class ExceptionEvent extends Event {
 
     private final EventException exception;
 
-    public ExceptionEvent(@NotNull final EventException exception) throws Exception {
+    public ExceptionEvent(@NotNull final Exception exception) throws EventException {
         super(SLF4JProvider.getSystem());
-        this.exception = exception;
+        this.exception = (EventException) exception;
         if (!fireEvent(this)) {
             System.out.flush();
             System.err.println("Exception caught! Consider listening for 'EventException'.");
-            throw exception;
+            throw this.exception;
         }
     }
 

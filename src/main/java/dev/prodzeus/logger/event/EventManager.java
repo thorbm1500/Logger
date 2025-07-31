@@ -4,6 +4,7 @@ import dev.prodzeus.logger.Logger;
 import dev.prodzeus.logger.event.components.EventListener;
 import dev.prodzeus.logger.event.components.RegisteredListener;
 import dev.prodzeus.logger.event.components.EventException;
+import dev.prodzeus.logger.event.events.exception.ExceptionEvent;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
@@ -51,13 +52,11 @@ public final class EventManager {
     }
 
     @Contract(pure = true)
-    public static @NotNull Collection<RegisteredListener> getAllHandlers() {
-        synchronized (registeredListeners) {
-            return registeredListeners;
-        }
+    public static synchronized @NotNull Collection<RegisteredListener> getAllHandlers() {
+        return registeredListeners;
     }
 
-    public static boolean registerListener(@NotNull final EventListener listener, @NotNull final Logger logger) {
+    public static boolean registerListener(@NotNull final EventListener listener, @NotNull final Logger logger) throws EventException {
         synchronized (registeredListeners) {
             if (!registeredListeners.isEmpty()) {
                 for (final RegisteredListener l : registeredListeners) {
@@ -67,8 +66,9 @@ public final class EventManager {
 
             try {
                 return registeredListeners.add(RegisteredListener.createNewListener(listener,logger));
-            } catch (final EventException e) {
-                throw new RuntimeException(e);
+            } catch (final Exception e) {
+                new ExceptionEvent(e);
+                return false;
             }
         }
     }
@@ -82,7 +82,7 @@ public final class EventManager {
         }
     }
 
-    public void unregisterAll(@NotNull final Logger logger) throws EventException {
+    public static void unregisterAll(@NotNull final Logger logger) throws EventException {
         synchronized (registeredListeners) {
             try {
                 registeredListeners.removeIf(registeredListener -> registeredListener.getOwner().equals(logger));

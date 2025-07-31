@@ -34,7 +34,13 @@ public final class Logger implements org.slf4j.Logger {
      */
     public Logger(@NotNull final String name) {
         this.name = name;
-        EventManager.registerListener(new DefaultListener(), this);
+        try {
+            EventManager.registerListener(new DefaultListener(this), this);
+        } catch (EventException e) {
+            System.out.println("Failed to register default listener! No logs will be printed!");
+            e.printStackTrace();
+            return;
+        }
         setLevel(Level.INFO);
         info("\u001b[38;5;46mNew Logger instance created.");
     }
@@ -43,10 +49,17 @@ public final class Logger implements org.slf4j.Logger {
         this(clazz.getName());
     }
 
-    public static class DefaultListener implements EventListener {
+    public static final class DefaultListener implements EventListener {
+
+        private final Logger logger;
+
+        public DefaultListener(@NotNull final Logger logger) {
+            this.logger = logger;
+        }
+
         @EventHandler
         public void onLogEvent(@NotNull final GenericLogEvent event) {
-            System.out.println(event.getFormattedLog());
+            if (logger.isLoggable(event.getLevel())) System.out.println(event.getFormattedLog());
         }
     }
 
