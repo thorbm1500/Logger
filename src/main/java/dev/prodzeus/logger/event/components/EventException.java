@@ -1,4 +1,7 @@
-package dev.prodzeus.logger.event.exception;
+package dev.prodzeus.logger.event.components;
+
+import dev.prodzeus.logger.event.events.exception.ExceptionEvent;
+import lombok.SneakyThrows;
 
 import java.io.Serial;
 
@@ -9,6 +12,7 @@ public class EventException extends Exception {
     private final Throwable cause;
     private final long timestamp;
 
+    @SneakyThrows
     public EventException(final String message, final Throwable cause) {
         super(message);
         this.timestamp = System.currentTimeMillis();
@@ -16,6 +20,7 @@ public class EventException extends Exception {
         new ExceptionEvent(this);
     }
 
+    @SneakyThrows
     public EventException(final Throwable cause) {
         super();
         this.timestamp = System.currentTimeMillis();
@@ -23,6 +28,7 @@ public class EventException extends Exception {
         new ExceptionEvent(this);
     }
 
+    @SneakyThrows
     public EventException(final String message) {
         super(message);
         this.timestamp = System.currentTimeMillis();

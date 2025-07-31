@@ -1,4 +1,4 @@
-package dev.prodzeus.logger.event.log;
+package dev.prodzeus.logger.event.events.log;
 
 import dev.prodzeus.logger.Level;
 import dev.prodzeus.logger.Logger;
@@ -13,31 +13,14 @@ public final class DebugLogEvent extends GenericLogEvent {
 
     public DebugLogEvent(@NotNull final Logger logger, @NotNull final Collection<Marker> marker, @NotNull final String log, @NotNull final Collection<Object> args) {
         super(logger, Level.DEBUG, marker, log, args);
-        fireEvent(this);
-    }
-
-    public DebugLogEvent(@NotNull final Logger logger, @NotNull final Marker marker, @NotNull final String log, @NotNull final Collection<Object> args) {
-        this(logger, Set.of(marker), log, args);
-    }
-
-    public DebugLogEvent(@NotNull final Logger logger, @NotNull final String log, @NotNull final Collection<Object> args) {
-        this(logger, Collections.emptySet(), log, args);
-    }
-
-    public DebugLogEvent(@NotNull final Logger logger, @NotNull final Marker marker, @NotNull final String log, @NotNull final Object... args) {
-        this(logger, marker, log, Set.of(args));
     }
 
     public DebugLogEvent(@NotNull final Logger logger, @NotNull final org.slf4j.Marker marker, @NotNull final String log, @NotNull final Object... args) {
-        this(logger, Marker.of(marker), log, args);
-    }
-
-    public DebugLogEvent(@NotNull final Logger logger, @NotNull final Marker marker, @NotNull final String log, @NotNull final Object arg) {
-        this(logger, marker, log, Set.of(arg));
+        this(logger, Set.of(Marker.of(marker)), log, Set.of(args));
     }
 
     public DebugLogEvent(@NotNull final Logger logger, @NotNull final org.slf4j.Marker marker, @NotNull final String log, @NotNull final Object arg) {
-        this(logger, Marker.of(marker), log, Set.of(arg));
+        this(logger, Set.of(Marker.of(marker)), log, Set.of(arg));
     }
 
     public DebugLogEvent(@NotNull final Logger logger, @NotNull final String log, @NotNull final Object... arg) {
@@ -48,15 +31,26 @@ public final class DebugLogEvent extends GenericLogEvent {
         this(logger, Collections.emptySet(), log, Set.of(arg));
     }
 
-    public DebugLogEvent(@NotNull final Logger logger, @NotNull final Marker marker, @NotNull final String log) {
-        this(logger, marker, log, Collections.emptySet());
-    }
-
     public DebugLogEvent(@NotNull final Logger logger, @NotNull final org.slf4j.Marker marker, @NotNull final String log) {
-        this(logger, Marker.of(marker), log, Collections.emptySet());
+        this(logger, Set.of(Marker.of(marker)), log, Collections.emptySet());
     }
 
     public DebugLogEvent(@NotNull final Logger logger, @NotNull final String log) {
         this(logger, Collections.emptySet(), log, Collections.emptySet());
+    }
+
+    @Override
+    public void fire() {
+        fireEvent(this);
+    }
+
+    @Override
+    public void fireSynchronized() {
+        fireEventSync(this);
+    }
+
+    @Override
+    public void fireAsync() {
+        fireEventAsync(this);
     }
 }

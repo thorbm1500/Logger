@@ -1,7 +1,9 @@
 package dev.prodzeus.logger.event;
 
 import dev.prodzeus.logger.Logger;
-import dev.prodzeus.logger.event.exception.EventException;
+import dev.prodzeus.logger.event.components.EventListener;
+import dev.prodzeus.logger.event.components.RegisteredListener;
+import dev.prodzeus.logger.event.components.EventException;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 

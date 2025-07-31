@@ -1,8 +1,8 @@
-package dev.prodzeus.logger.event;
+package dev.prodzeus.logger.event.components;
 
 import dev.prodzeus.logger.Logger;
 import dev.prodzeus.logger.SLF4JProvider;
-import dev.prodzeus.logger.event.exception.EventException;
+import dev.prodzeus.logger.event.Event;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.Method;

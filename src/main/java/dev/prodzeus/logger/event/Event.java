@@ -1,9 +1,11 @@
 package dev.prodzeus.logger.event;
 
 import dev.prodzeus.logger.Logger;
-import dev.prodzeus.logger.SLF4JProvider;
-import dev.prodzeus.logger.event.exception.EventException;
-import dev.prodzeus.logger.event.exception.ExceptionEvent;
+import dev.prodzeus.logger.event.components.EventListener;
+import dev.prodzeus.logger.event.components.RegisteredListener;
+import dev.prodzeus.logger.event.components.EventException;
+import dev.prodzeus.logger.event.events.exception.ExceptionEvent;
+import lombok.SneakyThrows;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
@@ -22,6 +24,7 @@ public abstract class Event {
     protected final Logger logger;
     protected final Collection<RegisteredListener> listeners = new HashSet<>();
 
+    @SneakyThrows
     protected Event(final Logger logger) {
         if (logger == null) new ExceptionEvent(new EventException("Listener for event cannot be null!"));
         this.logger = logger;
@@ -57,8 +60,11 @@ public abstract class Event {
         return logger.getName();
     }
 
-    public Collection<RegisteredListener> getRegisteredListeners() throws EventException {
-        if (listeners.isEmpty()) throw new EventException(new IllegalStateException("No registered listeners found!"));
+    public Collection<RegisteredListener> getRegisteredListeners() {
         return listeners;
     }
+
+    protected abstract void fire();
+    protected abstract void fireSynchronized();
+    protected abstract void fireAsync();
 }

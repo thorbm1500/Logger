@@ -1,7 +1,8 @@
-package dev.prodzeus.logger.event.exception;
+package dev.prodzeus.logger.event.events.exception;
 
 import dev.prodzeus.logger.SLF4JProvider;
 import dev.prodzeus.logger.event.Event;
+import dev.prodzeus.logger.event.components.EventException;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
@@ -9,12 +10,13 @@ public final class ExceptionEvent extends Event {
 
     private final EventException exception;
 
-    public ExceptionEvent(@NotNull final EventException exception) {
+    public ExceptionEvent(@NotNull final EventException exception) throws Exception {
         super(SLF4JProvider.getSystem());
         this.exception = exception;
         if (!fireEvent(this)) {
-            System.err.printf("Exception caught! Consider listening for `EventException`. %s \n", exception.getMessage());
-            exception.printStackTrace();
+            System.out.flush();
+            System.err.println("Exception caught! Consider listening for 'EventException'.");
+            throw exception;
         }
     }
 
@@ -36,5 +38,23 @@ public final class ExceptionEvent extends Event {
     @Contract(pure = true)
     public long getTimestamp() {
         return exception.getTimestamp();
+    }
+
+    @Override
+    protected void fire() {
+        /* Unused */
+        fireEvent(this);
+    }
+
+    @Override
+    protected void fireSynchronized() {
+        /* Unused */
+        fireEventSync(this);
+    }
+
+    @Override
+    protected void fireAsync() {
+        /* Unused */
+        fireEventAsync(this);
     }
 }

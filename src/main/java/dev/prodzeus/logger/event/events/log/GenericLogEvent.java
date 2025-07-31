@@ -1,4 +1,4 @@
-package dev.prodzeus.logger.event.log;
+package dev.prodzeus.logger.event.events.log;
 
 import dev.prodzeus.logger.Level;
 import dev.prodzeus.logger.Logger;
@@ -48,9 +48,28 @@ public abstract class GenericLogEvent extends Event {
             } else {
                 log.append("[").append(logger.getName()).append("] ");
             }
-            log.append(line).append("\n");
+            if (line.contains("@")) {
+                log.append(formatLogColors(line));
+            } else {
+                log.append(line);
+            }
+            log.append("\n");
         }
         return log.toString().stripTrailing();
+    }
+
+    private @NotNull String formatLogColors(@NotNull final String line) {
+        String newLine = line;
+        if (newLine.contains("@black")) newLine = newLine.replace("@black","\u001b[30m");
+        if (newLine.contains("@red")) newLine = newLine.replace("@red","\u001b[38;5;196m");
+        if (newLine.contains("@green")) newLine = newLine.replace("@green","\u001b[38;5;46m");
+        if (newLine.contains("@yellow")) newLine = newLine.replace("@yellow","\u001b[38;5;227m");
+        if (newLine.contains("@blue")) newLine = newLine.replace("@blue","\u001b[38;5;33m");
+        if (newLine.contains("@magenta")) newLine = newLine.replace("@magenta","\u001b[38;5;93m");
+        if (newLine.contains("@cyan")) newLine = newLine.replace("@cyan","\u001b[38;5;14m");
+        if (newLine.contains("@white")) newLine = newLine.replace("@white","\u001b[38;5;255m");
+        if (newLine.contains("@reset")) newLine = newLine.replace("@reset","\u001b[0m");
+        return newLine;
     }
 
     public @NotNull Level getLevel() {

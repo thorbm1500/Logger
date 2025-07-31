@@ -1,4 +1,4 @@
-package dev.prodzeus.logger.event;
+package dev.prodzeus.logger.event.components;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
