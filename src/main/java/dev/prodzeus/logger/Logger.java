@@ -1187,6 +1187,7 @@ public final class Logger implements org.slf4j.Logger {
             switch (arg) {
                 case EventException e -> {
                     final StringBuilder builder = new StringBuilder();
+                    builder.append(Level.ERROR.getColor()).append(e.getMessage()).append("\n");
                     for (final StackTraceElement st : e.getStackTrace()) {
                         builder.append(Level.ERROR.getColor()).append(st.toString()).append("\n");
                     }
@@ -1194,6 +1195,7 @@ public final class Logger implements org.slf4j.Logger {
                 }
                 case Throwable t -> {
                     final StringBuilder builder = new StringBuilder();
+                    builder.append(Level.ERROR.getColor()).append(t.getMessage()).append("\n");
                     for (final StackTraceElement st : t.getStackTrace()) {
                         builder.append(Level.ERROR.getColor()).append(st.toString()).append("\n");
                     }

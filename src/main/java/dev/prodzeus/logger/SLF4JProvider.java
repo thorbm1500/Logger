@@ -44,6 +44,7 @@ public final class SLF4JProvider implements SLF4JServiceProvider {
      */
     public SLF4JProvider() {
         instance = this;
+        Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> new EventException(throwable));
     }
 
     /**
@@ -145,8 +146,6 @@ public final class SLF4JProvider implements SLF4JServiceProvider {
             e.printStackTrace();
             return;
         }
-
-        Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> new EventException(throwable));
 
         getSystem().info("SLF4JProvider initialized.");
     }
