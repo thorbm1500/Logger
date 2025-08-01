@@ -9,40 +9,27 @@ public final class EventException extends Exception {
 
     @Serial
     private static final long serialVersionUID = 1L;
-    private final Throwable cause;
-    private final long timestamp;
+    private final long timestamp = System.currentTimeMillis();
 
     @SneakyThrows
     public EventException(final String message, final Throwable cause) {
-        super(message);
-        this.timestamp = System.currentTimeMillis();
-        this.cause = cause;
+        super(message,cause);
         new ExceptionEvent(this);
     }
 
     @SneakyThrows
     public EventException(final Throwable cause) {
-        super();
-        this.timestamp = System.currentTimeMillis();
-        this.cause = cause;
+        super(cause);
         new ExceptionEvent(this);
     }
 
     @SneakyThrows
     public EventException(final String message) {
         super(message);
-        this.timestamp = System.currentTimeMillis();
-        this.cause = null;
         new ExceptionEvent(this);
-    }
-
-    @Override
-    public synchronized Throwable getCause() {
-        return cause;
     }
 
     public long getTimestamp() {
         return timestamp;
     }
-
 }

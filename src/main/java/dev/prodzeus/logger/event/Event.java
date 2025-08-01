@@ -1,6 +1,7 @@
 package dev.prodzeus.logger.event;
 
 import dev.prodzeus.logger.Logger;
+import dev.prodzeus.logger.SLF4JProvider;
 import dev.prodzeus.logger.event.components.EventListener;
 import dev.prodzeus.logger.event.components.RegisteredListener;
 import dev.prodzeus.logger.event.components.EventException;
@@ -28,39 +29,31 @@ public abstract class Event {
 
     @SneakyThrows
     protected boolean fireEvent(@NotNull final Event event) {
-        listeners.addAll(EventManager.getHandlers(event));
+        listeners.addAll(SLF4JProvider.get().getEventManager().getHandlers(event));
         if (listeners.isEmpty()) return false;
         for (final RegisteredListener listener : listeners) {
-            try {
-                listener.accept(event);
-            } catch (EventException e) {
-                new ExceptionEvent(e);
-            }
+            listener.accept(event);
         }
         return true;
     }
 
-    protected synchronized boolean fireEventSync(@NotNull final Event event) {
-        return fireEvent(event);
+    protected boolean fireEventSync(@NotNull final Event event) {
+        synchronized (Event.class) {
+            return fireEvent(event);
+        }
     }
 
     protected boolean fireEventAsync(@NotNull final Event event) {
-        listeners.addAll(EventManager.getHandlers(event));
+        listeners.addAll(SLF4JProvider.get().getEventManager().getHandlers(event));
         if (listeners.isEmpty()) return false;
         for (final RegisteredListener listener : listeners) {
-            threadPool.submit(() -> {
-                try {
-                    listener.accept(event);
-                } catch (EventException e) {
-                    e.printStackTrace();
-                }
-            });
+            threadPool.submit(() -> listener.accept(event));
         }
         return true;
     }
 
     public interface Executor {
-        void execute(EventListener listener, Event event) throws EventException;
+        void execute(EventListener listener, Event event);
     }
 
     public String getCaller() {

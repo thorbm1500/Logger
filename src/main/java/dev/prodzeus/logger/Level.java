@@ -1,26 +1,30 @@
 package dev.prodzeus.logger;
 
-public enum Level implements Comparable<Level> {
-    OFF("Off","[OFF]","\u001b[1m\u001b[38;5;240m[\u001b[38;5;7mOFF\u001b[38;5;240m]\u001b[0m","\u001b[38;5;15m",0),
-    TRACE("Trace","[TRACE]","\u001b[1m\u001b[38;5;240m[\u001b[38;5;165mTRACE\u001b[38;5;240m]\u001b[0m","\u001b[64;64;64m",100),
-    DEBUG("Debug","[DEBUG]","\u001b[1m\u001b[38;5;240m[\u001b[38;5;87mDEBUG\u001b[38;5;240m]\u001b[0m","\u001b[64;64;64m",200),
-    INFO("Info","[INFO]","\u001b[1m\u001b[38;5;240m[\u001b[38;5;226mINFO\u001b[38;5;240m]\u001b[0m","\u001b[38;5;231m",300),
-    WARNING("Warning","[WARNING]","\u001b[1m\u001b[38;5;240m[\u001b[38;5;202mWARNING\u001b[38;5;240m]\u001b[0m","\u001b[38;5;208m",400),
-    ERROR("Error","[ERROR]","\u001b[1m\u001b[38;5;240m[\u001b[38;5;196mERROR\u001b[38;5;240m]\u001b[0m","\u001b[1m\u001b[38;5;196m",500),
-    ALL("All","[ALL]","\u001b[1m\u001b[38;5;240m[\u001b[38;5;15mALL\u001b[38;5;240m]\u001b[0m","\u001b[38;5;15m",1000)
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+public enum Level {
+    OFF("Off","OFF","@gray",null,0),
+    TRACE("Trace","TRACE","@magenta",null,100),
+    DEBUG("Debug","DEBUG","@cyan",null,200),
+    INFO("Info","INFO","@yellow",null,300),
+    WARNING("Warning","WARNING","@orange","@orange",400),
+    ERROR("Error","ERROR","@red","@red",500),
+    EXCEPTION("Exception","EXCEPTION","@red","@red",800),
+    ALL("All","ALL","@white",null,1000)
     ;
 
     private final String name;
-    private final String rawPrefix;
+    private final String prefixRaw;
     private final String prefix;
     private final String color;
     private final int weight;
 
-    Level(final String name, final String rawPrefix, final String prefix, final String color, final int weight) {
+    Level(final String name, final String prefix, @NotNull final String prefixColor, @Nullable final String color, final int weight) {
         this.name = name;
-        this.rawPrefix = rawPrefix;
-        this.prefix = prefix;
-        this.color = color;
+        this.prefixRaw = prefix;
+        this.prefix = "@bold@gray["+prefixColor+prefix+"@gray]@reset";
+        this.color = "@reset" + (color == null ? "@offwhite" : color);
         this.weight = weight;
     }
 
@@ -38,10 +42,20 @@ public enum Level implements Comparable<Level> {
     }
 
     public String getRawPrefix() {
-        return rawPrefix;
+        return prefixRaw;
     }
 
     public String getColor() {
         return color;
+    }
+
+    /**
+     * Checks if the level of this instance is loggable.
+     * @param o The logger's current Log Level.
+     * @return True, if the weight of the level provided is higher than this instance's weight,
+     * otherwise false.
+     */
+    public boolean isLoggable(@NotNull final Level o) {
+        return o.getWeight() <= weight;
     }
 }

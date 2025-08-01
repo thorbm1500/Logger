@@ -1,22 +1,20 @@
 package dev.prodzeus.logger.event.events.exception;
 
-import dev.prodzeus.logger.SLF4JProvider;
-import dev.prodzeus.logger.event.Event;
 import dev.prodzeus.logger.event.components.EventException;
+import dev.prodzeus.logger.event.events.log.GenericLogEvent;
+import lombok.SneakyThrows;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
-public final class ExceptionEvent extends Event {
+public final class ExceptionEvent extends GenericLogEvent {
 
-    private final EventException exception;
-
-    public ExceptionEvent(@NotNull final Exception exception) throws EventException {
-        super(SLF4JProvider.getSystem());
-        this.exception = (EventException) exception;
-        if (!fireEvent(this)) {
+    @SneakyThrows
+    public ExceptionEvent(@NotNull final Throwable exception) {
+        super(exception);
+        if (!fireEventSync(this)) {
             System.out.flush();
             System.err.println("Exception caught! Consider listening for 'EventException'.");
-            throw this.exception;
+            throw (Exception) getCause();
         }
     }
 
@@ -37,24 +35,22 @@ public final class ExceptionEvent extends Event {
 
     @Contract(pure = true)
     public long getTimestamp() {
-        return exception.getTimestamp();
+        if (exception instanceof EventException e) return e.getTimestamp();
+        else return 0;
     }
 
     @Override
     protected void fire() {
-        /* Unused */
         fireEvent(this);
     }
 
     @Override
     protected void fireSynchronized() {
-        /* Unused */
         fireEventSync(this);
     }
 
     @Override
     protected void fireAsync() {
-        /* Unused */
         fireEventAsync(this);
     }
 }

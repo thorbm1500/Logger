@@ -7,17 +7,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class LoggerFactory implements ILoggerFactory {
 
-    private static LoggerFactory instance;
+    private final ConcurrentHashMap<String, Logger> loggers = new ConcurrentHashMap<>(16);
 
-    private static final ConcurrentHashMap<String, Logger> loggers = new ConcurrentHashMap<>(16);
-
-    private LoggerFactory() {
-        instance = this;
-    }
-
-    public static synchronized LoggerFactory getInstance() {
-        return instance == null ? new LoggerFactory() : instance;
-    }
+    public LoggerFactory() {}
 
     /**
      * Gets the Logger with the given name. If no Loggers are present of the given name,
@@ -27,12 +19,14 @@ public final class LoggerFactory implements ILoggerFactory {
      * @return A Logger instance.
      */
     @Override
-    public synchronized Logger getLogger(@NotNull final String name) {
+    public Logger getLogger(@NotNull final String name) {
         if (!loggers.isEmpty() && loggers.containsKey(name) && loggers.get(name) != null) {
             return loggers.get(name);
         }
         final Logger logger = new Logger(name);
-        loggers.put(name, logger);
+        synchronized (loggers) {
+            loggers.put(name, logger);
+        }
         return logger;
     }
 }

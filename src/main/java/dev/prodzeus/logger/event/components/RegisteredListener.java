@@ -1,6 +1,7 @@
 package dev.prodzeus.logger.event.components;
 
 import dev.prodzeus.logger.Logger;
+import dev.prodzeus.logger.SLF4JProvider;
 import dev.prodzeus.logger.event.Event;
 import dev.prodzeus.logger.event.events.exception.ExceptionEvent;
 import org.jetbrains.annotations.NotNull;
@@ -36,13 +37,14 @@ public final class RegisteredListener {
         return events;
     }
 
-    public void accept(@NotNull final Event event)throws EventException {
+    public void accept(@NotNull final Event event) {
         for (final Event.Executor executor : executors) {
             executor.execute(listener,event);
         }
     }
 
     public static @NotNull RegisteredListener createNewListener(@NotNull final EventListener listener, @NotNull final Logger logger) throws Exception {
+        SLF4JProvider.getSystem().traceAsync("Attempting new registration of {} for logger instance {}",listener.getClass().getSimpleName(),logger.getName());
         final HashSet<Method> methods = HashSet.newHashSet(4);
         try {
             final Method[] definedMethods = listener.getClass().getMethods();

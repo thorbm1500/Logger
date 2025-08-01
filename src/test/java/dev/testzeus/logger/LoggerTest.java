@@ -1,44 +1,40 @@
 package dev.testzeus.logger;
 
+import dev.prodzeus.logger.Level;
 import dev.prodzeus.logger.Logger;
 import dev.prodzeus.logger.SLF4JProvider;
 import org.junit.jupiter.api.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-//@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class LoggerTest {
 
     @Test
-    @Order(2)
+    @Order(1)
     void newSLF4JProviderTest() {
-        assertDoesNotThrow(() -> SLF4JProvider.getInstance().initialize());
+        assertDoesNotThrow(() -> SLF4JProvider.getSystem().setLevel(Level.INFO));
     }
 
     @Test
-    @Order(3)
     void SLF4JProviderMethodsTest() {
-        assertDoesNotThrow(() -> {
-            assertAll(
-                    () -> assertNotNull(SLF4JProvider.getInstance().getLoggerFactory()),
-                    () -> assertNotNull(SLF4JProvider.getInstance().getMarkerFactory()),
-                    () -> assertNotNull(SLF4JProvider.getInstance().getMDCAdapter()),
-                    () -> assertNotNull(SLF4JProvider.getInstance().getEventManager()),
-                    () -> assertNotNull(SLF4JProvider.getInstance().getRequestedApiVersion())
-            );
-        });
+        assertAll(
+                () -> assertNotNull(SLF4JProvider.get().getLoggerFactory()),
+                () -> assertNotNull(SLF4JProvider.get().getMarkerFactory()),
+                () -> assertNotNull(SLF4JProvider.get().getMDCAdapter()),
+                () -> assertNotNull(SLF4JProvider.get().getEventManager()),
+                () -> assertNotNull(SLF4JProvider.get().getRequestedApiVersion())
+        );
     }
 
     @Test
-    @Order(4)
     void newLoggerTest() {
-        assertAll(() -> SLF4JProvider.getInstance().getLoggerFactory().getLogger("dev.prodzeus.test"));
+        assertAll(() -> SLF4JProvider.get().getLoggerFactory().getLogger("dev.prodzeus.test"));
     }
 
     @Test
-    @Order(5)
     void logTest() {
-        final Logger logger = SLF4JProvider.getInstance().getLoggerFactory().getLogger("dev.prodzeus.test");
+        final Logger logger = SLF4JProvider.get().getLoggerFactory().getLogger("dev.prodzeus.test");
         assertAll(
                 () -> logger.trace("Test."),
                 () -> logger.trace("Test. @black black@reset @red red@reset @blue blue@reset reset"),
@@ -59,9 +55,8 @@ class LoggerTest {
     }
 
     @Test
-    @Order(6)
     void logTestSynchronized() {
-        final Logger logger = SLF4JProvider.getInstance().getLoggerFactory().getLogger("dev.prodzeus.test");
+        final Logger logger = SLF4JProvider.get().getLoggerFactory().getLogger("dev.prodzeus.test");
         assertAll(
                 () -> logger.traceSynchronized("Test."),
                 () -> logger.traceSynchronized("Test. @black black@reset @red red@reset @blue blue@reset reset"),
@@ -82,9 +77,8 @@ class LoggerTest {
     }
 
     @Test
-    @Order(7)
     void logTestAsync() {
-        final Logger logger = SLF4JProvider.getInstance().getLoggerFactory().getLogger("dev.prodzeus.test");
+        final Logger logger = SLF4JProvider.get().getLoggerFactory().getLogger("dev.prodzeus.test");
         assertAll(
                 () -> logger.traceAsync("Test."),
                 () -> logger.traceAsync("Test. @black black@reset @red red@reset @blue blue@reset reset"),

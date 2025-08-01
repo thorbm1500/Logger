@@ -1,8 +1,5 @@
 package dev.prodzeus.logger;
 
-import dev.prodzeus.logger.event.components.EventHandler;
-import dev.prodzeus.logger.event.components.EventListener;
-import dev.prodzeus.logger.event.EventManager;
 import dev.prodzeus.logger.event.components.EventException;
 import dev.prodzeus.logger.event.events.log.*;
 import org.jetbrains.annotations.Contract;
@@ -34,33 +31,12 @@ public final class Logger implements org.slf4j.Logger {
      */
     public Logger(@NotNull final String name) {
         this.name = name;
-        try {
-            EventManager.registerListener(new DefaultListener(this), this);
-        } catch (EventException e) {
-            System.out.println("Failed to register default listener! No logs will be printed!");
-            e.printStackTrace();
-            return;
-        }
         setLevel(Level.INFO);
-        info("\u001b[38;5;46mNew Logger instance created.");
+        info("@greenNew Logger instance created.");
     }
 
     public Logger(@NotNull final Class<?> clazz) {
         this(clazz.getName());
-    }
-
-    public static final class DefaultListener implements EventListener {
-
-        private final Logger logger;
-
-        public DefaultListener(@NotNull final Logger logger) {
-            this.logger = logger;
-        }
-
-        @EventHandler
-        public void onLogEvent(@NotNull final GenericLogEvent event) {
-            if (logger.isLoggable(event.getLevel())) System.out.println(event.getFormattedLog());
-        }
     }
 
     /**
@@ -118,6 +94,10 @@ public final class Logger implements org.slf4j.Logger {
     @Contract(pure = true)
     public @NotNull Level getLevel() {
         return level;
+    }
+
+    public void suppressExceptions(final boolean suppress) {
+        SLF4JProvider.get().suppressExceptions(suppress);
     }
 
     /**
@@ -1067,6 +1047,7 @@ public final class Logger implements org.slf4j.Logger {
     public void errorSynchronized(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
         new ErrorLogEvent(this, format(message, arg1, arg2), arg1, arg2).fireSynchronized();
     }
+
     public void errorAsync(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
         new ErrorLogEvent(this, format(message, arg1, arg2), arg1, arg2).fireAsync();
     }
