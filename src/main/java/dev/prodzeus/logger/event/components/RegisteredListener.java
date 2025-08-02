@@ -6,6 +6,7 @@ import dev.prodzeus.logger.event.Event;
 import dev.prodzeus.logger.event.events.exception.ExceptionEvent;
 import org.jetbrains.annotations.NotNull;
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.HashSet;
@@ -58,34 +59,41 @@ public final class RegisteredListener {
             new ExceptionEvent(e);
         }
 
-        if (methods.isEmpty()) throw new EventException(new IllegalStateException("No methods found!"));
+        if (methods.isEmpty()) new ExceptionEvent(new IllegalStateException("No methods found!"));
 
         final HashSet<Class<? extends Event>> events = HashSet.newHashSet(4);
         final HashSet<Event.Executor> executors = HashSet.newHashSet(4);
         for (final Method method : methods) {
-            if (method == null) throw new EventException(new IllegalStateException("Method is null!"));
+            if (method == null) {
+                new ExceptionEvent(new IllegalStateException("Method is null!"));
+                continue;
+            }
 
             final EventHandler eventHandler = method.getAnnotation(EventHandler.class);
             if (eventHandler == null) continue;
 
             if (method.getParameterCount() != 1) {
-                throw new EventException(new IllegalStateException("Method %s must have exactly one parameter!".formatted(method.getName())));
+                new ExceptionEvent(new IllegalStateException("Method %s must have exactly one parameter!".formatted(method.getName())));
+                continue;
             }
 
             final Class<?> clazz;
             if (!Event.class.isAssignableFrom(clazz = method.getParameterTypes()[0])) {
-                throw new EventException(new IllegalStateException("Method %s must implement a valid Event!".formatted(method.getName())));
+                new ExceptionEvent(new IllegalStateException("Method %s must implement a valid Event!".formatted(method.getName())));
+                continue;
             }
             method.setAccessible(true);
             final Class<? extends Event> event = clazz.asSubclass(Event.class);
 
             events.add(event);
             executors.add((l, e) -> {
-                if (!event.isAssignableFrom(e.getClass())) return;
                 try {
-                    method.invoke(l, e);
-                } catch (Exception ex) {
-                    new ExceptionEvent(ex);
+                    if (event.isAssignableFrom(e.getClass())) method.invoke(l, e);
+                } catch (InvocationTargetException ex) {
+                    ex.printStackTrace();
+                } catch (Throwable t) {
+                    System.out.println("Log failed!");
+                    t.printStackTrace();
                 }
             });
 

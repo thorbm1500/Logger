@@ -32,7 +32,9 @@ public final class EventManager {
         synchronized (registeredListeners) {
             for (final RegisteredListener listener : registeredListeners) {
                 for (final Class<? extends Event> clazz : listener.getEventsListeningFor()) {
-                    if (clazz.isAssignableFrom(event)) handlers.add(listener);
+                    if (clazz.isAssignableFrom(event)) {
+                        handlers.add(listener);
+                    }
                 }
             }
         }
