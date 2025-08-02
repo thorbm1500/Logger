@@ -54,7 +54,7 @@ public final class EventManager {
                     final Logger owner = l.getOwner();
                     if (listener.getClass().equals(SLF4JProvider.DefaultListener.class)
                         || owner.getName().equals(logger.getName())
-                           && l.getListenerRegistered().getClass().isInstance(listener.getClass())) return null;
+                           && l.getListenerRegistered().equals(listener)) return null;
                 }
             }
             final RegisteredListener newListener = RegisteredListener.createNewListener(listener, logger);

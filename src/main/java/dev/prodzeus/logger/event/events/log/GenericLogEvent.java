@@ -42,6 +42,8 @@ public abstract class GenericLogEvent extends Event {
     }
 
     private @NotNull String formatException() {
+        if (exception == null) return "Exception thrown with no cause!";
+
         StringBuilder log = new StringBuilder();
 
         if (exception.getStackTrace().length != 0) {
