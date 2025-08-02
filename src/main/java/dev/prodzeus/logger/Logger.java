@@ -19,7 +19,7 @@ import java.util.regex.Matcher;
 public final class Logger implements org.slf4j.Logger {
 
     private final String name;
-    private Level level;
+    private Level level = Level.INFO;
     private final Set<Marker> forcedMarkers = new HashSet<>();
 
     /**
@@ -31,7 +31,6 @@ public final class Logger implements org.slf4j.Logger {
      */
     public Logger(@NotNull final String name) {
         this.name = name;
-        setLevel(Level.INFO);
         info("@greenNew Logger instance created.");
     }
 
