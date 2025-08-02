@@ -37,10 +37,8 @@ public abstract class Event {
         return true;
     }
 
-    protected boolean fireEventSync(@NotNull final Event event) {
-        synchronized (Event.class) {
-            return fireEvent(event);
-        }
+    protected synchronized boolean fireEventSync(@NotNull final Event event) {
+        return fireEvent(event);
     }
 
     protected boolean fireEventAsync(@NotNull final Event event) {
