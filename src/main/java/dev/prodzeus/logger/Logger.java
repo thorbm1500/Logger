@@ -80,6 +80,7 @@ public final class Logger implements org.slf4j.Logger {
      */
     public Logger setLevel(@NotNull final Level level) {
         this.level = level;
+        SLF4JProvider.getSystem().setLevel(level);
         return this;
     }
 

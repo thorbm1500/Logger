@@ -4,14 +4,14 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public enum Level {
-    OFF("Off","OFF","@gray",null,0),
+    ALL("All","ALL","@white",null,0),
     TRACE("Trace","TRACE","@magenta",null,100),
     DEBUG("Debug","DEBUG","@cyan",null,200),
     INFO("Info","INFO","@yellow",null,300),
     WARNING("Warning","WARNING","@orange","@orange",400),
     ERROR("Error","ERROR","@red","@red",500),
     EXCEPTION("Exception","EXCEPTION","@red","@red",800),
-    ALL("All","ALL","@white",null,1000)
+    OFF("Off","OFF","@gray",null,1000)
     ;
 
     private final String name;
