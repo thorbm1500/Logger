@@ -44,6 +44,7 @@ public final class SLF4JProvider implements SLF4JServiceProvider {
      */
     public SLF4JProvider() {
         instance = this;
+        createSystemLogger();
         Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> new EventException(throwable));
     }
 
@@ -54,23 +55,17 @@ public final class SLF4JProvider implements SLF4JServiceProvider {
     public static SLF4JProvider get() {
         synchronized (SLF4JProvider.class) {
             if (instance == null) new SLF4JProvider().initialize();
-            if (!initialized) instance.initialize();
             return instance;
         }
     }
 
     public static Logger getSystem() {
-        if (system == null) {
-            if (instance == null) get();
-            else createSystemLogger();
-        }
+        if (system == null) get();
         return system;
     }
 
     private static void createSystemLogger() {
-        synchronized (SLF4JProvider.class) {
-            system = loggerFactory.getLogger("dev.prodzeus.logger");
-        }
+        system = loggerFactory.getLogger("dev.prodzeus.logger");
     }
 
     /**
@@ -106,7 +101,7 @@ public final class SLF4JProvider implements SLF4JServiceProvider {
         suppressedExceptionNotification = notify;
     }
 
-    public static Logger getLogger(@NotNull final String name) {
+    public Logger getLogger(@NotNull final String name) {
         return loggerFactory.getLogger(name);
     }
 
