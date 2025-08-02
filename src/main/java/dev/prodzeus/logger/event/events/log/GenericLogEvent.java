@@ -124,8 +124,8 @@ public abstract class GenericLogEvent extends Event {
         return exception != null;
     }
 
-    public @Nullable Exception getException() {
-        return (Exception) exception;
+    public @Nullable Throwable getException() {
+        return exception;
     }
 
     public @NotNull Level getLevel() {
