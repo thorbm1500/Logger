@@ -1,10 +1,10 @@
 package dev.prodzeus.logger;
 
 import dev.prodzeus.logger.event.EventManager;
-import dev.prodzeus.logger.event.components.EventException;
 import dev.prodzeus.logger.event.components.EventHandler;
 import dev.prodzeus.logger.event.components.EventListener;
 import dev.prodzeus.logger.event.components.RegisteredListener;
+import dev.prodzeus.logger.event.events.exception.ExceptionEvent;
 import dev.prodzeus.logger.event.events.log.ExceptionLogEvent;
 import dev.prodzeus.logger.event.events.log.GenericLogEvent;
 import lombok.SneakyThrows;
@@ -46,7 +46,7 @@ public final class SLF4JProvider implements SLF4JServiceProvider {
         instance = this;
         createSystemLogger();
         try {
-            Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> new EventException(throwable));
+            Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> new ExceptionEvent(throwable));
         } catch (Exception ignored) {}
     }
 
