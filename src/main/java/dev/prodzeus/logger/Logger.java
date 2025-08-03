@@ -1182,17 +1182,12 @@ public final class Logger implements org.slf4j.Logger {
 
     @Contract(pure = true)
     private static @NotNull String format(@NotNull final String log, @NotNull final Object... args) {
-        String message = log.replace("%s", "{}").replace("%d", "{}");
-        for (final Object arg : args) {
+        String message = log.replaceAll("%[s|d]", Matcher.quoteReplacement("{}"))
+                .replace("%d", Matcher.quoteReplacement("{}"))
+                .replaceAll("(%(\\.\\d)?f)", Matcher.quoteReplacement("{}"));
+        for (Object arg : args) {
+            if (arg instanceof EventException e) arg = e.getCause();
             switch (arg) {
-                case EventException e -> {
-                    final StringBuilder builder = new StringBuilder();
-                    builder.append(Level.ERROR.getColor()).append(e.getMessage()).append("\n");
-                    for (final StackTraceElement st : e.getStackTrace()) {
-                        builder.append(Level.ERROR.getColor()).append(st.toString()).append("\n");
-                    }
-                    message = message.replaceFirst("\\{}", Matcher.quoteReplacement(builder.toString()));
-                }
                 case Throwable t -> {
                     final StringBuilder builder = new StringBuilder();
                     builder.append(Level.ERROR.getColor()).append(t.getMessage()).append("\n");
@@ -1209,7 +1204,7 @@ public final class Logger implements org.slf4j.Logger {
                         builder.append(iterator.next());
                         if (iterator.hasNext()) builder.append(", ");
                     }
-                    builder.append(" ]");
+                    builder.append("]");
                     message = message.replaceFirst("\\{}", Matcher.quoteReplacement(builder.toString()));
                 }
                 case Map<?, ?> m -> {
@@ -1221,6 +1216,13 @@ public final class Logger implements org.slf4j.Logger {
                     builder.append("}");
                     message = message.replaceFirst("\\{}", Matcher.quoteReplacement(builder.toString()));
                 }
+                /*case Number n -> {
+                    if (!message.contains("\\{}"))
+                    if (Pattern.matches("(\\{-([a-zA-Z]){1,3}})",message)) {
+                        String replacement = Pattern.compile("(\\{-([a-zA-Z]){1,3}})").matcher(message).toMatchResult().toString();
+                        message = message.replaceFirst("(\\{-([a-zA-Z]){1,3}})", Matcher.quoteReplacement(replacement));
+                    }
+                }*/
                 case String s -> message = message.replaceFirst("\\{}", Matcher.quoteReplacement(s));
                 default -> message = message.replaceFirst("\\{}", Matcher.quoteReplacement(arg.toString()));
             }

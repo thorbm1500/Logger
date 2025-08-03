@@ -25,7 +25,7 @@ public abstract class GenericLogEvent extends Event {
         super(logger);
         this.level = level;
         this.exception = null;
-        this.rawLog = log.concat("@reset");
+        this.rawLog = log;
         this.log = formatLogMessage(true);
         this.args = args;
         this.markers = marker;
@@ -72,9 +72,9 @@ public abstract class GenericLogEvent extends Event {
     }
 
     private @NotNull String formatLogMessage(final boolean color) {
-        StringBuilder log = new StringBuilder();
+        final StringBuilder log = new StringBuilder();
 
-        for (final String line : rawLog.split("\n")) {
+        for (final String line : rawLog.concat(color?"":removeLogColors(rawLog)).split("\n")) {
             log.append(color ? level.getPrefix() : level.getRawPrefix());
 
             if (markers != null && !markers.isEmpty()) {
@@ -95,8 +95,7 @@ public abstract class GenericLogEvent extends Event {
             }
             log.append(line).append("\n");
         }
-        final String message = log.toString().stripTrailing();
-        return color && message.contains("@") ? formatLogColors(message) : message;
+        return color ? formatLogColors(log.toString().stripTrailing().concat("@reset")) : log.toString().stripTrailing();
     }
 
     private @NotNull String formatLogColors(@NotNull final String log) {
@@ -117,6 +116,27 @@ public abstract class GenericLogEvent extends Event {
         if (formatted.contains("@underline")) formatted = formatted.replace("@underline","\u001b[4m");
         if (formatted.contains("@reversed")) formatted = formatted.replace("@reversed","\u001b[7m");
         if (formatted.contains("@reset")) formatted = formatted.replace("@reset","\u001b[0m");
+        return formatted;
+    }
+
+    private @NotNull String removeLogColors(@NotNull final String log) {
+        String formatted = log;
+        if (formatted.contains("@black")) formatted = formatted.replace("@black","");
+        if (formatted.contains("@gray")) formatted = formatted.replace("@gray","");
+        if (formatted.contains("@lightgray")) formatted = formatted.replace("@lightgray","");
+        if (formatted.contains("@white")) formatted = formatted.replace("@white","");
+        if (formatted.contains("@offwhite")) formatted = formatted.replace("@offwhite","");
+        if (formatted.contains("@red")) formatted = formatted.replace("@red","");
+        if (formatted.contains("@orange")) formatted = formatted.replace("@orange","");
+        if (formatted.contains("@yellow")) formatted = formatted.replace("@yellow","");
+        if (formatted.contains("@green")) formatted = formatted.replace("@green","");
+        if (formatted.contains("@blue")) formatted = formatted.replace("@blue","");
+        if (formatted.contains("@magenta")) formatted = formatted.replace("@magenta","");
+        if (formatted.contains("@cyan")) formatted = formatted.replace("@cyan","");
+        if (formatted.contains("@bold")) formatted = formatted.replace("@bold","");
+        if (formatted.contains("@underline")) formatted = formatted.replace("@underline","");
+        if (formatted.contains("@reversed")) formatted = formatted.replace("@reversed","");
+        if (formatted.contains("@reset")) formatted = formatted.replace("@reset","");
         return formatted;
     }
 
