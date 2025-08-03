@@ -74,7 +74,7 @@ public abstract class GenericLogEvent extends Event {
     private @NotNull String formatLogMessage(final boolean color) {
         final StringBuilder log = new StringBuilder();
 
-        for (final String line : rawLog.concat(color?"":removeLogColors(rawLog)).split("\n")) {
+        for (final String line : "".concat(color?rawLog:removeLogColors(rawLog)).split("\n")) {
             log.append(color ? level.getPrefix() : level.getRawPrefix());
 
             if (markers != null && !markers.isEmpty()) {
