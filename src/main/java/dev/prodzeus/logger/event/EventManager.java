@@ -2,85 +2,55 @@ package dev.prodzeus.logger.event;
 
 import dev.prodzeus.logger.Logger;
 import dev.prodzeus.logger.SLF4JProvider;
-import dev.prodzeus.logger.event.components.EventException;
 import dev.prodzeus.logger.event.components.EventListener;
-import dev.prodzeus.logger.event.components.RegisteredListener;
-import org.jetbrains.annotations.Contract;
+import dev.prodzeus.logger.event.events.log.ExceptionLogEvent;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
 public final class EventManager {
 
-    private final Set<RegisteredListener> registeredListeners = new HashSet<>();
+    private final HashSet<@NotNull EventListener> registeredListeners = new HashSet<>();
 
-    public EventManager() {
+    public EventManager() {}
+
+    /**
+     * Get all listeners registered.
+     * @return An unmodifiable {@link Set<>}, that's either empty,
+     * or containing <b>@NotNull</b> EventListeners.
+     */
+    public Set<@NotNull EventListener> getListeners() {
+        return Collections.unmodifiableSet(registeredListeners);
     }
 
-    @Contract(pure = true)
-    public @NotNull Collection<RegisteredListener> getHandlers(@NotNull final Event event) {
-        return getHandlers(event.getClass());
-    }
-
-
-    @Contract(pure = true)
-    public @NotNull Collection<RegisteredListener> getHandlers(@NotNull final Class<? extends Event> event) {
-        final Collection<RegisteredListener> handlers = new HashSet<>();
-
-        synchronized (registeredListeners) {
-            for (final RegisteredListener listener : registeredListeners) {
-                for (final Class<? extends Event> clazz : listener.getEventsListeningFor()) {
-                    if (clazz.isAssignableFrom(event)) {
-                        handlers.add(listener);
-                    }
-                }
-            }
-        }
-
-        return handlers;
-    }
-
-    @Contract(pure = true)
-    public synchronized @NotNull Collection<RegisteredListener> getAllHandlers() {
-        return registeredListeners;
-    }
-
-    public RegisteredListener registerListener(@NotNull final EventListener listener, @NotNull final Logger logger) throws Exception {
+    public boolean registerListener(@NotNull final EventListener listener) {
         synchronized (registeredListeners) {
             if (!registeredListeners.isEmpty()) {
-                for (final RegisteredListener l : registeredListeners) {
-                    if (l == null) continue;
-
-                    final Logger owner = l.getOwner();
+                for (final EventListener l : registeredListeners) {
                     if (listener.getClass().equals(SLF4JProvider.DefaultListener.class)
-                        || owner.getName().equals(logger.getName())
-                           && l.getListenerRegistered().equals(listener)) return null;
+                        || l.equals(listener)) return false;
                 }
             }
-            final RegisteredListener newListener = RegisteredListener.createNewListener(listener, logger);
-            registeredListeners.add(newListener);
-            return newListener;
+            return registeredListeners.add(listener);
         }
     }
 
-    public boolean unregisterListener(@NotNull final EventListener listener, @NotNull final Logger logger) {
+    public boolean unregisterListener(@NotNull final EventListener listener) {
+        if (registeredListeners.isEmpty()) return true;
         synchronized (registeredListeners) {
-            if (registeredListeners.isEmpty()) return true;
-            return registeredListeners.removeIf(
-                    registeredListener -> registeredListener.getListenerRegistered().equals(listener)
-                                          && registeredListener.getOwner().equals(logger));
+            return registeredListeners.removeIf(registeredListener -> registeredListener.equals(listener));
         }
     }
 
-    public void unregisterAll(@NotNull final Logger logger) throws EventException {
-        synchronized (registeredListeners) {
-            try {
+    public void unregisterAll(@NotNull final Logger logger) {
+        try {
+            synchronized (registeredListeners) {
                 registeredListeners.removeIf(registeredListener -> registeredListener.getOwner().equals(logger));
-            } catch (Exception e) {
-                throw new EventException(new RuntimeException(e));
             }
+        } catch (Exception e) {
+            new ExceptionLogEvent(new RuntimeException(e));
         }
     }
 }

@@ -1,9 +1,7 @@
 package dev.prodzeus.logger;
 
 import dev.prodzeus.logger.event.EventManager;
-import dev.prodzeus.logger.event.components.EventHandler;
 import dev.prodzeus.logger.event.components.EventListener;
-import dev.prodzeus.logger.event.components.RegisteredListener;
 import dev.prodzeus.logger.event.events.exception.ExceptionEvent;
 import dev.prodzeus.logger.event.events.log.ExceptionLogEvent;
 import dev.prodzeus.logger.event.events.log.GenericLogEvent;
@@ -135,48 +133,72 @@ public final class SLF4JProvider implements SLF4JServiceProvider {
     public void initialize() {
         if (initialized) return;
         initialized = true;
-
-        try {
-            eventManager.registerListener(new DefaultListener(), getSystem());
-        } catch (Exception e) {
-            System.out.println("SLF4JProvider initialization failed! Failed to register default listener! No logs will be printed!");
-            e.printStackTrace();
-            return;
-        }
-
         getSystem().info("SLF4JProvider initialized.");
     }
 
     @SneakyThrows
-    public boolean registerListener(final EventListener listener, final Logger logger) {
-        final RegisteredListener newListener = eventManager.registerListener(listener,logger);
-        if (newListener == null) {
-            getSystem().info("{} already has this Listener type registered!",logger.getName());
-            return false;
-        } else {
-            getSystem().info("{} is now registered to {}",newListener.getListenerRegistered().getClass().getSimpleName(),logger.getName());
+    public boolean registerListener(final EventListener listener) {
+        if (eventManager.registerListener(listener)) {
+            getSystem().info("{} is now registered to {}",listener.getClass().getSimpleName(),listener.getOwner().getName());
             return true;
+        } else {
+            getSystem().info("This Listener has already been registered!");
+            return false;
         }
     }
 
-    public boolean unregisterListener(final EventListener listener, final Logger logger) {
-        if (eventManager.unregisterListener(listener,logger)) {
-            getSystem().info("{} is no longer registered to {}",listener.getClass().getSimpleName(),logger.getName());
+    public boolean unregisterListener(final EventListener listener) {
+        if (eventManager.unregisterListener(listener)) {
+            getSystem().info("{} is no longer registered.",listener.getClass().getSimpleName());
             return true;
         }
         return false;
     }
 
-    public static final class DefaultListener implements EventListener {
-        @EventHandler
-        public void onLogEvent(@NotNull final GenericLogEvent event) {
+    private static final class DefaultListener extends EventListener {
+
+        DefaultListener() {
+            super(getSystem());
+        }
+        private Level level = Level.INFO;
+
+        public void updateLogLevel(@NotNull final Level level) {
+            this.level = level;
+        }
+
+        @Override
+        public void onGenericLogEvent(@NotNull final GenericLogEvent event) {
             if (event.getException() != null && suppressExceptions) {
                 if (suppressedExceptionNotification) {
                     new ExceptionLogEvent("Notification: " + event.getException().getCause().getClass().getSimpleName() + " detected.");
                 }
                 return;
             }
-            if (event.getLevel().isLoggable(getSystem().getLevel())) System.out.println(event.getFormattedLog());
+            if (event.getLevel().isLoggable(level)) System.out.println(event.getFormattedLog());
+        }
+    }
+
+    private static final class SysLogger extends Logger {
+
+        private final DefaultListener defaultListener;
+
+        public SysLogger(@NotNull String name) {
+            super(name);
+            this.defaultListener = new DefaultListener();
+
+            try {
+                eventManager.registerListener(defaultListener);
+            } catch (Exception e) {
+                System.out.println("SLF4JProvider initialization failed to register default listener! No logs will be printed!");
+                e.printStackTrace();
+            }
+        }
+
+        @Override
+        public Logger setLevel(@NotNull final Level level) {
+            this.level = level;
+            defaultListener.updateLogLevel(level);
+            return this;
         }
     }
 }

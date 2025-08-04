@@ -5,6 +5,7 @@ import dev.prodzeus.logger.Logger;
 import dev.prodzeus.logger.Marker;
 import dev.prodzeus.logger.SLF4JProvider;
 import dev.prodzeus.logger.event.Event;
+import dev.prodzeus.logger.event.components.EventListener;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -29,6 +30,9 @@ public abstract class GenericLogEvent extends Event {
         this.log = formatLogMessage(true);
         this.args = args;
         this.markers = marker;
+        for (EventListener listener : getListeners()) {
+            fireEventSync(() -> listener.onGenericLogEvent(this));
+        }
     }
 
     protected GenericLogEvent(@NotNull final Throwable exception) {

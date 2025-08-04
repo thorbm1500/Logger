@@ -3,13 +3,13 @@ package dev.testzeus.event;
 import dev.prodzeus.logger.Logger;
 import dev.prodzeus.logger.SLF4JProvider;
 import dev.prodzeus.logger.event.components.EventException;
-import dev.prodzeus.logger.event.components.EventHandler;
 import dev.prodzeus.logger.event.components.EventListener;
 import dev.prodzeus.logger.event.events.log.*;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class EventTest {
 
@@ -52,7 +52,7 @@ class EventTest {
         assertAll(
                 () -> {
                     final Logger logger = SLF4JProvider.get().getLoggerFactory().getLogger("dev.prodzeus.test");
-                    SLF4JProvider.get().registerListener(new Listener(),logger);
+                    SLF4JProvider.get().registerListener(new Listener(logger));
 
                     logger.info("INFO Test.");
                     logger.trace("TRACE Test.");
@@ -61,8 +61,12 @@ class EventTest {
         );
     }
 
-    public static class Listener implements EventListener {
-        @EventHandler
+    public static class Listener extends EventListener {
+
+        protected Listener(@NotNull Logger logger) {
+            super(logger);
+        }
+
         public void onLogMessage(@NotNull final GenericLogEvent event) {
             System.out.println("Event Listener: " + event.getFormattedLog());
         }

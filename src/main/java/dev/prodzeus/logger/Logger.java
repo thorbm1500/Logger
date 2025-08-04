@@ -16,10 +16,10 @@ import java.util.regex.Matcher;
  * @author prodzeus
  * @apiNote SLF4J Version: <b>2.0.12</b>
  */
-public final class Logger implements org.slf4j.Logger {
+public class Logger implements org.slf4j.Logger {
 
-    private final String name;
-    private Level level = Level.INFO;
+    protected final String name;
+    protected Level level = Level.INFO;
     private final Set<Marker> forcedMarkers = new HashSet<>();
 
     /**
@@ -79,7 +79,9 @@ public final class Logger implements org.slf4j.Logger {
      */
     public Logger setLevel(@NotNull final Level level) {
         this.level = level;
-        if (!this.equals(SLF4JProvider.getSystem())) SLF4JProvider.getSystem().setLevel(level);
+        if (!this.equals(SLF4JProvider.getSystem())) {
+            SLF4JProvider.getSystem().setLevel(level);
+        }
         return this;
     }
 

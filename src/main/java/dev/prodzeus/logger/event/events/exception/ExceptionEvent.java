@@ -1,56 +1,75 @@
 package dev.prodzeus.logger.event.events.exception;
 
+import dev.prodzeus.logger.SLF4JProvider;
+import dev.prodzeus.logger.event.Event;
 import dev.prodzeus.logger.event.components.EventException;
-import dev.prodzeus.logger.event.events.log.GenericLogEvent;
-import lombok.SneakyThrows;
+import dev.prodzeus.logger.event.components.EventListener;
+import dev.prodzeus.logger.event.events.log.ExceptionLogEvent;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
-public final class ExceptionEvent extends GenericLogEvent {
+import java.util.Arrays;
 
-    @SneakyThrows
-    public ExceptionEvent(@NotNull final Throwable exception) {
-        super(exception);
-        if (!fireEventSync(this)) {
+public final class ExceptionEvent extends Event {
+
+    private final Throwable throwable;
+
+    public ExceptionEvent(@NotNull final Throwable throwable) {
+        super(SLF4JProvider.getSystem());
+        this.throwable = throwable;
+        if (getListeners()
+                .stream()
+                .noneMatch(
+                        l -> Arrays
+                                .stream(l.getClass()
+                                        .getDeclaredMethods())
+                                .noneMatch(
+                                        m -> m.getName().equalsIgnoreCase("onExceptionEvent")))) {
             System.out.flush();
-            System.err.println("Exception caught! Consider listening for 'EventException'.");
-            throw (Exception) getCause();
+            SLF4JProvider.getSystem().warn("Uncaught exception thrown! Consider listening for 'EventException'.");
+            new ExceptionLogEvent(throwable).fireSynchronized();
         }
     }
 
     @Contract(pure = true)
     public @NotNull Throwable getCause() {
-        return exception.getCause();
+        return throwable.getCause();
     }
 
     @Contract(pure = true)
     public @NotNull String getMessage() {
-        return exception.getMessage();
+        return throwable.getMessage();
     }
 
     @Contract(pure = true)
     public @NotNull StackTraceElement[] getStackTrace() {
-        return exception.getStackTrace();
+        return throwable.getStackTrace();
     }
 
     @Contract(pure = true)
     public long getTimestamp() {
-        if (exception instanceof EventException e) return e.getTimestamp();
+        if (throwable instanceof EventException e) return e.getTimestamp();
         else return 0;
     }
 
     @Override
-    protected void fire() {
-        fireEvent(this);
+    public void fire() {
+        for (@NotNull final EventListener listener : getListeners()) {
+            fireEvent(() -> listener.onExceptionEvent(this));
+        }
     }
 
     @Override
-    protected void fireSynchronized() {
-        fireEventSync(this);
+    public void fireSynchronized() {
+        for (@NotNull final EventListener listener : getListeners()) {
+            fireEventSync(() -> listener.onExceptionEvent(this));
+        }
     }
 
     @Override
-    protected void fireAsync() {
-        fireEventAsync(this);
+    public void fireAsync() {
+        for (@NotNull final EventListener listener : getListeners()) {
+            fireEventAsync(() -> listener.onExceptionEvent(this));
+        }
     }
 }

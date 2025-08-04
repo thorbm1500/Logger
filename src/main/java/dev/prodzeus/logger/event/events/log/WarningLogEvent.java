@@ -3,6 +3,7 @@ package dev.prodzeus.logger.event.events.log;
 import dev.prodzeus.logger.Level;
 import dev.prodzeus.logger.Logger;
 import dev.prodzeus.logger.Marker;
+import dev.prodzeus.logger.event.components.EventListener;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
@@ -41,16 +42,22 @@ public final class WarningLogEvent extends GenericLogEvent {
 
     @Override
     public void fire() {
-        fireEvent(this);
+        for (@NotNull final EventListener listener : getListeners()) {
+            fireEvent(() -> listener.onWarningLogEvent(this));
+        }
     }
 
     @Override
     public void fireSynchronized() {
-        fireEventSync(this);
+        for (@NotNull final EventListener listener : getListeners()) {
+            fireEventSync(() -> listener.onWarningLogEvent(this));
+        }
     }
 
     @Override
     public void fireAsync() {
-        fireEventAsync(this);
+        for (@NotNull final EventListener listener : getListeners()) {
+            fireEventAsync(() -> listener.onWarningLogEvent(this));
+        }
     }
 }
