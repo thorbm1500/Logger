@@ -9,49 +9,51 @@ import org.slf4j.Marker;
 import java.util.Collection;
 import java.util.Collections;
 
-public final class ErrorLogEvent extends GenericLogEvent {
+public final class LogEvent extends GenericLogEvent {
 
-    public ErrorLogEvent(@NotNull final Logger logger, @NotNull final Collection<Marker> marker, @NotNull final String log, @NotNull final Collection<Object> args) {
-        super(logger, Level.ERROR, marker, log, args);
+
+    public LogEvent(@NotNull Logger logger, @NotNull Collection<Marker> marker, @NotNull String log, @NotNull Collection<Object> args) {
+        super(logger, Level.ALL, marker, log, args);
+        fireSynchronized();
     }
 
-    public ErrorLogEvent(@NotNull final Logger logger, @NotNull final Collection<Marker> marker, @NotNull final String log) {
+    public LogEvent(@NotNull final Logger logger, @NotNull final Collection<Marker> marker, @NotNull final String log) {
         this(logger, marker, log, Collections.emptySet());
     }
 
-    public ErrorLogEvent(@NotNull final Logger logger, @NotNull final String log, @NotNull final Collection<Object> args) {
+    public LogEvent(@NotNull final Logger logger, @NotNull final String log, @NotNull final Collection<Object> args) {
         this(logger, Collections.emptySet(), log, args);
     }
 
-    public ErrorLogEvent(@NotNull final Logger logger, @NotNull final String log) {
+    public LogEvent(@NotNull final Logger logger, @NotNull final String log) {
         this(logger, Collections.emptySet(), log, Collections.emptySet());
     }
 
     @Override
-    public void fire() {
+    protected void fire() {
         for (@NotNull final EventListener listener : getListeners()) {
             fireEvent(() -> {
-                listener.onErrorLogEvent(this);
+                listener.onLogEvent(this);
                 listener.onGenericEvent(this);
             });
         }
     }
 
     @Override
-    public void fireSynchronized() {
+    protected void fireSynchronized() {
         for (@NotNull final EventListener listener : getListeners()) {
             fireEventSync(() -> {
-                listener.onErrorLogEvent(this);
+                listener.onLogEvent(this);
                 listener.onGenericEvent(this);
             });
         }
     }
 
     @Override
-    public void fireAsync() {
+    protected void fireAsync() {
         for (@NotNull final EventListener listener : getListeners()) {
             fireEventAsync(() -> {
-                listener.onErrorLogEvent(this);
+                listener.onLogEvent(this);
                 listener.onGenericEvent(this);
             });
         }

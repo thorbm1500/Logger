@@ -1,13 +1,20 @@
-package dev.prodzeus.logger;
+package dev.prodzeus.logger.slf4j;
 
+import dev.prodzeus.logger.Logger;
+import dev.prodzeus.logger.components.Level;
+import dev.prodzeus.logger.event.Event;
 import dev.prodzeus.logger.event.EventManager;
 import dev.prodzeus.logger.event.components.EventListener;
 import dev.prodzeus.logger.event.events.exception.ExceptionEvent;
 import dev.prodzeus.logger.event.events.log.ExceptionLogEvent;
 import dev.prodzeus.logger.event.events.log.GenericLogEvent;
-import lombok.SneakyThrows;
+import dev.prodzeus.logger.event.events.log.WarningLogEvent;
+import net.dv8tion.jda.api.events.GenericEvent;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.spi.SLF4JServiceProvider;
+
+import java.io.Serial;
+import java.io.Serializable;
 
 /**
  * @author Thor B.<br>
@@ -16,8 +23,11 @@ import org.slf4j.spi.SLF4JServiceProvider;
  */
 public final class SLF4JProvider implements SLF4JServiceProvider {
 
+    private static Level globalLevel = Level.INFO;
+
     private static SLF4JProvider instance;
-    private static Logger system;
+    private static SysLogger system;
+    private static DefaultListener defaultListener;
     private static boolean initialized = false;
     private static boolean suppressExceptions = false;
     private static boolean suppressedExceptionNotification = true;
@@ -41,10 +51,11 @@ public final class SLF4JProvider implements SLF4JServiceProvider {
      * @see SLF4JProvider#get()
      */
     public SLF4JProvider() {
-        instance = this;
-        createSystemLogger();
+        if (instance == null) instance = this;
+        if (system == null) system = new SysLogger("dev.prodzeus.logger");
+        initialize();
         try {
-            Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> new ExceptionEvent(throwable));
+            Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> new Thread(() -> new ExceptionEvent(throwable)));
         } catch (Exception ignored) {}
     }
 
@@ -59,13 +70,12 @@ public final class SLF4JProvider implements SLF4JServiceProvider {
         }
     }
 
-    public static Logger getSystem() {
-        if (system == null) get();
+    public static @NotNull Logger getSystem() {
         return system;
     }
 
-    private static void createSystemLogger() {
-        system = loggerFactory.getLogger("dev.prodzeus.logger");
+    public static void setGlobalLevel(@NotNull final Level level) {
+        globalLevel = level;
     }
 
     /**
@@ -132,33 +142,58 @@ public final class SLF4JProvider implements SLF4JServiceProvider {
     @Override
     public void initialize() {
         if (initialized) return;
+        if (defaultListener == null) {
+            defaultListener = new DefaultListener(system);
+            try {
+                if (!eventManager.registerListener(defaultListener)) System.out.println("Failed to register listener. Listener is already registered!");
+            } catch (Exception e) {
+                System.out.println("SLF4JProvider initialization failed to register default listener! No logs will be printed!");
+                e.printStackTrace();
+            }
+        }
         initialized = true;
-        getSystem().info("SLF4JProvider initialized.");
+        system.info("SLF4JProvider initialized.");
     }
 
-    @SneakyThrows
     public boolean registerListener(final EventListener listener) {
         if (eventManager.registerListener(listener)) {
-            getSystem().info("{} is now registered to {}",listener.getClass().getSimpleName(),listener.getOwner().getName());
+            system.info("{} is now registered to {}",listener.getClass().getSimpleName(),listener.getOwner().getName());
             return true;
         } else {
-            getSystem().info("This Listener has already been registered!");
+            system.info("This Listener has already been registered!");
             return false;
         }
     }
 
     public boolean unregisterListener(final EventListener listener) {
         if (eventManager.unregisterListener(listener)) {
-            getSystem().info("{} is no longer registered.",listener.getClass().getSimpleName());
+            system.info("{} is no longer registered.",listener.getClass().getSimpleName());
             return true;
         }
         return false;
     }
 
+    private static final class SysLogger extends Logger implements Serializable {
+
+        @Serial
+        private static final long serialVersionUID = 215951535491651L;
+
+        public SysLogger(@NotNull String name) {
+            super(name);
+        }
+
+        @Override
+        public Logger setLevel(@NotNull final Level level) {
+            this.level = level;
+            defaultListener.updateLogLevel(level);
+            return this;
+        }
+    }
+
     private static final class DefaultListener extends EventListener {
 
-        DefaultListener() {
-            super(getSystem());
+        DefaultListener(@NotNull final SysLogger logger) {
+            super(logger);
         }
         private Level level = Level.INFO;
 
@@ -167,38 +202,15 @@ public final class SLF4JProvider implements SLF4JServiceProvider {
         }
 
         @Override
-        public void onGenericLogEvent(@NotNull final GenericLogEvent event) {
-            if (event.getException() != null && suppressExceptions) {
+        public void onGenericEvent(@NotNull final Event event) {
+            if (event.isException() && suppressExceptions) {
                 if (suppressedExceptionNotification) {
-                    new ExceptionLogEvent("Notification: " + event.getException().getCause().getClass().getSimpleName() + " detected.");
+                    new WarningLogEvent(getSystem(), "Notification: " + event.getCause().getClass().getSimpleName() + " detected.");
                 }
-                return;
+            } else if (event.getLevel().isLoggable(level)) {
+                System.out.println(event.getMessage());
+                System.out.flush();
             }
-            if (event.getLevel().isLoggable(level)) System.out.println(event.getFormattedLog());
-        }
-    }
-
-    private static final class SysLogger extends Logger {
-
-        private final DefaultListener defaultListener;
-
-        public SysLogger(@NotNull String name) {
-            super(name);
-            this.defaultListener = new DefaultListener();
-
-            try {
-                eventManager.registerListener(defaultListener);
-            } catch (Exception e) {
-                System.out.println("SLF4JProvider initialization failed to register default listener! No logs will be printed!");
-                e.printStackTrace();
-            }
-        }
-
-        @Override
-        public Logger setLevel(@NotNull final Level level) {
-            this.level = level;
-            defaultListener.updateLogLevel(level);
-            return this;
         }
     }
 }

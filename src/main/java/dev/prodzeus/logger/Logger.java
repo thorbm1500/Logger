@@ -1,7 +1,10 @@
 package dev.prodzeus.logger;
 
+import dev.prodzeus.logger.components.Level;
 import dev.prodzeus.logger.event.components.EventException;
 import dev.prodzeus.logger.event.events.log.*;
+import dev.prodzeus.logger.slf4j.SLF4JProvider;
+import net.dv8tion.jda.api.exceptions.ErrorResponseException;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -9,6 +12,8 @@ import org.slf4j.Marker;
 
 import java.util.*;
 import java.util.regex.Matcher;
+
+import static dev.prodzeus.logger.components.Level.*;
 
 /**
  * A simple logger with SLF4J implementation and an Event Listening system inspired by Bukkit.
@@ -19,7 +24,7 @@ import java.util.regex.Matcher;
 public class Logger implements org.slf4j.Logger {
 
     protected final String name;
-    protected Level level = Level.INFO;
+    protected Level level = INFO;
     private final Set<Marker> forcedMarkers = new HashSet<>();
 
     /**
@@ -27,10 +32,11 @@ public class Logger implements org.slf4j.Logger {
      *
      * @param name Name of the new Logger instance.
      * @apiNote <b>This should only be called through the LoggerFactory!</b>
-     * @see LoggerFactory#getLogger(String)
+     * @see dev.prodzeus.logger.slf4j.LoggerFactory#getLogger(String) 
      */
     public Logger(@NotNull final String name) {
         this.name = name;
+        SLF4JProvider.get().getLoggerFactory().validate(this);
         info("@greenNew Logger instance created.");
     }
 
@@ -79,9 +85,7 @@ public class Logger implements org.slf4j.Logger {
      */
     public Logger setLevel(@NotNull final Level level) {
         this.level = level;
-        if (!this.equals(SLF4JProvider.getSystem())) {
-            SLF4JProvider.getSystem().setLevel(level);
-        }
+        SLF4JProvider.getSystem().setLevel(level);
         return this;
     }
 
@@ -108,7 +112,7 @@ public class Logger implements org.slf4j.Logger {
      * @param level The Level to check.
      * @return True, if log calls at this level are logged to console, otherwise false.
      */
-    @Contract(pure = true)
+     @Contract(pure = true)
     public boolean isLoggable(@NotNull final Level level) {
         return isLoggable(level, null);
     }
@@ -139,6 +143,96 @@ public class Logger implements org.slf4j.Logger {
         return name;
     }
 
+    private void validateAndFire(@NotNull Level level, @NotNull final String message) {
+        validateAndFire(level, message, Collections.emptySet());
+    }
+
+    private void validateAndFire(@NotNull Level level, @NotNull final Marker marker, @NotNull final String message) {
+        validateAndFire(level, Set.of(marker), message, Collections.emptySet());
+    }
+
+    private void validateAndFire(@NotNull Level level, @NotNull final String message, @NotNull Collection<Object> args) {
+        validateAndFire(level, Collections.emptySet(), message, args);
+    }
+
+    private void validateAndFire(@NotNull Level level, @NotNull final Marker marker, @NotNull final String message, @NotNull Collection<Object> args) {
+        validateAndFire(level, Set.of(marker), message, args);
+    }
+
+    private void validateAndFire(@NotNull Level level, @NotNull Collection<Marker> markers, @NotNull final String message, @NotNull Collection<Object> args) {
+        if (args.stream().anyMatch(Throwable.class::isInstance)) {
+            new ExceptionLogEvent(this, markers, message, args).fire();
+        } else switch (level) {
+            case OFF -> {/* Ignore. */}
+            case TRACE -> new TraceLogEvent(this, markers, message, args).fire();
+            case DEBUG -> new DebugLogEvent(this, markers, message, args).fire();
+            case INFO -> new InfoLogEvent(this, markers, message, args).fire();
+            case WARNING ->  new WarningLogEvent(this, markers, message, args).fire();
+            case ERROR -> new ErrorLogEvent(this, markers, message, args).fire();
+            case ALL -> new LogEvent(this, markers, message, args);
+        }
+    }
+
+    private void validateAndFireSynchronized(@NotNull Level level, @NotNull final String message) {
+        validateAndFireSynchronized(level, message, Collections.emptySet());
+    }
+
+    private void validateAndFireSynchronized(@NotNull Level level, @NotNull final Marker marker, @NotNull final String message) {
+        validateAndFireSynchronized(level, Set.of(marker), message, Collections.emptySet());
+    }
+
+    private void validateAndFireSynchronized(@NotNull Level level, @NotNull final String message, @NotNull Collection<Object> args) {
+        validateAndFireSynchronized(level, Collections.emptySet(), message, args);
+    }
+
+    private void validateAndFireSynchronized(@NotNull Level level, @NotNull final Marker marker, @NotNull final String message, @NotNull Collection<Object> args) {
+        validateAndFireSynchronized(level, Set.of(marker), message, args);
+    }
+
+    private void validateAndFireSynchronized(@NotNull Level level, @NotNull Collection<Marker> markers, @NotNull final String message, @NotNull Collection<Object> args) {
+        if (args.stream().anyMatch(Throwable.class::isInstance)) {
+            new ExceptionLogEvent(this, markers, message, args).fireSynchronized();
+        } else switch (level) {
+            case OFF -> {/* Ignore. */}
+            case TRACE -> new TraceLogEvent(this, markers, message, args).fireSynchronized();
+            case DEBUG -> new DebugLogEvent(this, markers, message, args).fireSynchronized();
+            case INFO -> new InfoLogEvent(this, markers, message, args).fireSynchronized();
+            case WARNING ->  new WarningLogEvent(this, markers, message, args).fireSynchronized();
+            case ERROR -> new ErrorLogEvent(this, markers, message, args).fireSynchronized();
+            case ALL -> new LogEvent(this, markers, message, args);
+        }
+    }
+
+    private void validateAndFireAsync(@NotNull Level level, @NotNull final String message) {
+        validateAndFireAsync(level, message, Collections.emptySet());
+    }
+
+    private void validateAndFireAsync(@NotNull Level level, @NotNull final Marker marker, @NotNull final String message) {
+        validateAndFireAsync(level, Set.of(marker), message, Collections.emptySet());
+    }
+
+    private void validateAndFireAsync(@NotNull Level level, @NotNull final String message, @NotNull Collection<Object> args) {
+        validateAndFireAsync(level, Collections.emptySet(), message, args);
+    }
+
+    private void validateAndFireAsync(@NotNull Level level, @NotNull final Marker marker, @NotNull final String message, @NotNull Collection<Object> args) {
+        validateAndFireAsync(level, Set.of(marker), message, args);
+    }
+
+    private void validateAndFireAsync(@NotNull Level level, @NotNull Collection<Marker> markers, @NotNull final String message, @NotNull Collection<Object> args) {
+        if (args.stream().anyMatch(Throwable.class::isInstance)) {
+            new ExceptionLogEvent(this, markers, message, args).fireAsync();
+        } else switch (level) {
+            case OFF -> {/* Ignore. */}
+            case TRACE -> new TraceLogEvent(this, markers, message, args).fireAsync();
+            case DEBUG -> new DebugLogEvent(this, markers, message, args).fireAsync();
+            case INFO -> new InfoLogEvent(this, markers, message, args).fireAsync();
+            case WARNING ->  new WarningLogEvent(this, markers, message, args).fireAsync();
+            case ERROR -> new ErrorLogEvent(this, markers, message, args).fireAsync();
+            case ALL -> new LogEvent(this, markers, message, args);
+        }
+    }
+
     /**
      * Check if log calls to Log Level {@link Level#TRACE} will be logged or ignored.
      *
@@ -152,79 +246,79 @@ public class Logger implements org.slf4j.Logger {
 
     @Override
     public void trace(@NotNull final String message) {
-        new TraceLogEvent(this, message).fire();
+        validateAndFire(TRACE, message);
     }
 
     public void traceSynchronized(@NotNull final String message) {
-        new TraceLogEvent(this, message).fireSynchronized();
+        validateAndFireSynchronized(TRACE, message);
     }
 
     public void traceAsync(@NotNull final String message) {
-        new TraceLogEvent(this, message).fireAsync();
+        validateAndFireAsync(TRACE, message);
     }
 
     @Override
     public void trace(@NotNull String message, @NotNull final Object arg) {
-        new TraceLogEvent(this, format(message, arg), arg).fire();
+        validateAndFire(TRACE, format(message, arg), Set.of(arg));
     }
 
     public void traceSynchronized(@NotNull String message, @NotNull final Object arg) {
-        new TraceLogEvent(this, format(message, arg), arg).fireSynchronized();
+        validateAndFireSynchronized(TRACE, format(message, arg), Set.of(arg));
     }
 
     public void traceAsync(@NotNull String message, @NotNull final Object arg) {
-        new TraceLogEvent(this, format(message, arg), arg).fireAsync();
+        validateAndFireAsync(TRACE, format(message, arg), Set.of(arg));
     }
 
     @Override
     public void trace(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
-        new TraceLogEvent(this, format(message, arg1, arg2), arg1, arg2).fire();
+        validateAndFire(TRACE, format(message, arg1, arg2), Set.of(arg1, arg2));
     }
 
     public void traceSynchronized(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
-        new TraceLogEvent(this, format(message, arg1, arg2), arg1, arg2).fireSynchronized();
+        validateAndFireSynchronized(TRACE, format(message, arg1, arg2), Set.of(arg1, arg2));
     }
 
     public void traceAsync(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
-        new TraceLogEvent(this, format(message, arg1, arg2), arg1, arg2).fireAsync();
+        validateAndFireAsync(TRACE, format(message, arg1, arg2), Set.of(arg1, arg2));
     }
 
     @Override
     public void trace(@NotNull String message, @NotNull final Object... args) {
-        new TraceLogEvent(this, format(message, args), args).fire();
+        validateAndFire(TRACE, format(message, args), Set.of(args));
     }
 
     public void traceSynchronized(@NotNull String message, @NotNull final Object... args) {
-        new TraceLogEvent(this, format(message, args), args).fireSynchronized();
+        validateAndFireSynchronized(TRACE, format(message, args), Set.of(args));
     }
 
     public void traceAsync(@NotNull String message, @NotNull final Object... args) {
-        new TraceLogEvent(this, format(message, args), args).fireAsync();
+        validateAndFireAsync(TRACE, format(message, args), Set.of(args));
     }
 
     @Override
     public void trace(@NotNull String message, @NotNull final Throwable t) {
-        new TraceLogEvent(this, format(message, t), t).fire();
+        validateAndFire(TRACE, format(message, t), Set.of(t));
     }
 
     public void traceSynchronized(@NotNull String message, @NotNull final Throwable t) {
-        new TraceLogEvent(this, format(message, t), t).fireSynchronized();
+        validateAndFireSynchronized(TRACE, format(message, t), Set.of(t));
     }
 
     public void traceAsync(@NotNull String message, @NotNull final Throwable t) {
-        new TraceLogEvent(this, format(message, t), t).fireAsync();
+        validateAndFireAsync(TRACE, format(message, t), Set.of(t));
     }
 
     public void trace(@NotNull String message, @NotNull final EventException e) {
-        new TraceLogEvent(this, format(message, e), e).fire();
+        validateAndFire(TRACE, format(message, e), Set.of(e));
     }
 
     public void traceSynchronized(@NotNull String message, @NotNull final EventException e) {
-        new TraceLogEvent(this, format(message, e), e).fireSynchronized();
+        validateAndFireSynchronized(TRACE, format(message, e), Set.of(e));
     }
 
     public void traceAsync(@NotNull String message, @NotNull final EventException e) {
-        new TraceLogEvent(this, format(message, e), e).fireAsync();
+        validateAndFireAsync(TRACE, format(message, e), Set.of(e));
     }
 
     /**
@@ -241,167 +335,166 @@ public class Logger implements org.slf4j.Logger {
 
     @Override
     public void trace(@NotNull final Marker marker, @NotNull final String message) {
-        new TraceLogEvent(this, marker, message).fire();
+        validateAndFire(TRACE, marker, message);
     }
 
     public void traceSynchronized(@NotNull final Marker marker, @NotNull final String message) {
-        new TraceLogEvent(this, marker, message).fireSynchronized();
+        validateAndFireSynchronized(TRACE, marker, message);
     }
 
     public void traceAsync(@NotNull final Marker marker, @NotNull final String message) {
-        new TraceLogEvent(this, marker, message).fireAsync();
+        validateAndFireAsync(TRACE, marker, message);
     }
 
     @Override
     public void trace(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        new TraceLogEvent(this, marker, format(message, arg), arg).fire();
+        validateAndFire(TRACE, marker, format(message,arg), Set.of(arg));
     }
 
     public void traceSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        new TraceLogEvent(this, marker, format(message, arg), arg).fireSynchronized();
+        validateAndFireSynchronized(TRACE, marker, format(message,arg), Set.of(arg));
     }
 
     public void traceAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        new TraceLogEvent(this, marker, format(message, arg), arg).fireAsync();
+        validateAndFireAsync(TRACE, marker, format(message,arg), Set.of(arg));
     }
 
     @Override
     public void trace(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new TraceLogEvent(this, marker, format(message, arg1, arg2), arg1, arg2).fire();
+        validateAndFire(TRACE, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
     }
 
     public void traceSynchronized(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new TraceLogEvent(this, marker, format(message, arg1, arg2), arg1, arg2).fireSynchronized();
+        validateAndFireSynchronized(TRACE, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
     }
 
     public void traceAsync(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new TraceLogEvent(this, marker, format(message, arg1, arg2), arg1, arg2).fireAsync();
+        validateAndFireAsync(TRACE, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
     }
 
     @Override
     public void trace(@NotNull final Marker marker, String message, Object... args) {
-        new TraceLogEvent(this, marker, format(message, args), args).fire();
+        validateAndFire(TRACE, marker, format(message,args), Set.of(args));
     }
 
     public void traceSynchronized(@NotNull final Marker marker, String message, Object... args) {
-        new TraceLogEvent(this, marker, format(message, args), args).fireSynchronized();
+        validateAndFireSynchronized(TRACE, marker, format(message,args), Set.of(args));
     }
 
     public void traceAsync(@NotNull final Marker marker, String message, Object... args) {
-        new TraceLogEvent(this, marker, format(message, args), args).fireAsync();
+        validateAndFireAsync(TRACE, marker, format(message,args), Set.of(args));
     }
 
     @Override
     public void trace(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
-        new TraceLogEvent(this, marker, format(message, t), t).fire();
+        validateAndFire(TRACE, marker, format(message,t), Set.of(t));
     }
 
     public void traceSynchronized(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
-        new TraceLogEvent(this, marker, format(message, t), t).fireSynchronized();
+        validateAndFireSynchronized(TRACE, marker, format(message,t), Set.of(t));
     }
 
     public void traceAsync(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
-        new TraceLogEvent(this, marker, format(message, t), t).fireAsync();
+        validateAndFireAsync(TRACE, marker, format(message,t), Set.of(t));
     }
 
     public void trace(@NotNull final Marker marker, String message, @NotNull final EventException e) {
-        new TraceLogEvent(this, marker, format(message, e), e).fire();
+        validateAndFire(TRACE, marker, format(message,e), Set.of(e));
     }
 
     public void traceSynchronized(@NotNull final Marker marker, String message, @NotNull final EventException e) {
-        new TraceLogEvent(this, marker, format(message, e), e).fireSynchronized();
+        validateAndFireSynchronized(TRACE, marker, format(message,e), Set.of(e));
     }
 
     public void traceAsync(@NotNull final Marker marker, String message, @NotNull final EventException e) {
-        new TraceLogEvent(this, marker, format(message, e), e).fireAsync();
+        validateAndFireAsync(TRACE, marker, format(message,e), Set.of(e));
     }
 
     /**
      * Check if log calls to Log Level {@link Level#DEBUG} will be logged or ignored.
-     *
      * @return True | False
      */
     @Contract(pure = true)
     @Override
     public boolean isDebugEnabled() {
-        return isLoggable(Level.DEBUG);
+        return isLoggable(DEBUG);
     }
 
     @Override
     public void debug(@NotNull final String message) {
-        new DebugLogEvent(this, message).fire();
+        validateAndFire(DEBUG, message);
     }
 
     public void debugSynchronized(@NotNull final String message) {
-        new DebugLogEvent(this, message).fireSynchronized();
+        validateAndFireSynchronized(DEBUG, message);
     }
 
     public void debugAsync(@NotNull final String message) {
-        new DebugLogEvent(this, message).fireAsync();
+        validateAndFireAsync(DEBUG, message);
     }
 
     @Override
-    public void debug(@NotNull final String message, @NotNull final Object arg) {
-        new DebugLogEvent(this, format(message, arg), arg).fire();
+    public void debug(@NotNull String message, @NotNull final Object arg) {
+        validateAndFire(DEBUG, format(message, arg), Set.of(arg));
     }
 
-    public void debugSynchronized(@NotNull final String message, @NotNull final Object arg) {
-        new DebugLogEvent(this, format(message, arg), arg).fireSynchronized();
+    public void debugSynchronized(@NotNull String message, @NotNull final Object arg) {
+        validateAndFireSynchronized(DEBUG, format(message, arg), Set.of(arg));
     }
 
-    public void debugAsync(@NotNull final String message, @NotNull final Object arg) {
-        new DebugLogEvent(this, format(message, arg), arg).fireAsync();
-    }
-
-    @Override
-    public void debug(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new DebugLogEvent(this, format(message, arg1, arg2), arg1, arg2).fire();
-    }
-
-    public void debugSynchronized(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new DebugLogEvent(this, format(message, arg1, arg2), arg1, arg2).fireSynchronized();
-    }
-
-    public void debugAsync(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new DebugLogEvent(this, format(message, arg1, arg2), arg1, arg2).fireAsync();
+    public void debugAsync(@NotNull String message, @NotNull final Object arg) {
+        validateAndFireAsync(DEBUG, format(message, arg), Set.of(arg));
     }
 
     @Override
-    public void debug(@NotNull final String message, @NotNull final Object... args) {
-        new DebugLogEvent(this, format(message, args), args).fire();
+    public void debug(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
+        validateAndFire(DEBUG, format(message, arg1, arg2), Set.of(arg1, arg2));
     }
 
-    public void debugSynchronized(@NotNull final String message, @NotNull final Object... args) {
-        new DebugLogEvent(this, format(message, args), args).fireSynchronized();
+    public void debugSynchronized(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
+        validateAndFireSynchronized(DEBUG, format(message, arg1, arg2), Set.of(arg1, arg2));
     }
 
-    public void debugAsync(@NotNull final String message, @NotNull final Object... args) {
-        new DebugLogEvent(this, format(message, args), args).fireAsync();
+    public void debugAsync(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
+        validateAndFireAsync(DEBUG, format(message, arg1, arg2), Set.of(arg1, arg2));
     }
 
     @Override
-    public void debug(@NotNull final String message, @NotNull final Throwable t) {
-        new DebugLogEvent(this, format(message, t), t).fire();
+    public void debug(@NotNull String message, @NotNull final Object... args) {
+        validateAndFire(DEBUG, format(message, args), Set.of(args));
     }
 
-    public void debugSynchronized(@NotNull final String message, @NotNull final Throwable t) {
-        new DebugLogEvent(this, format(message, t), t).fireSynchronized();
+    public void debugSynchronized(@NotNull String message, @NotNull final Object... args) {
+        validateAndFireSynchronized(DEBUG, format(message, args), Set.of(args));
     }
 
-    public void debugAsync(@NotNull final String message, @NotNull final Throwable t) {
-        new DebugLogEvent(this, format(message, t), t).fireAsync();
+    public void debugAsync(@NotNull String message, @NotNull final Object... args) {
+        validateAndFireAsync(DEBUG, format(message, args), Set.of(args));
     }
 
-    public void debug(@NotNull final String message, @NotNull final EventException e) {
-        new DebugLogEvent(this, format(message, e), e).fire();
+    @Override
+    public void debug(@NotNull String message, @NotNull final Throwable t) {
+        validateAndFire(DEBUG, format(message, t), Set.of(t));
     }
 
-    public void debugSynchronized(@NotNull final String message, @NotNull final EventException e) {
-        new DebugLogEvent(this, format(message, e), e).fireSynchronized();
+    public void debugSynchronized(@NotNull String message, @NotNull final Throwable t) {
+        validateAndFireSynchronized(DEBUG, format(message, t), Set.of(t));
     }
 
-    public void debugAsync(@NotNull final String message, @NotNull final EventException e) {
-        new DebugLogEvent(this, format(message, e), e).fireAsync();
+    public void debugAsync(@NotNull String message, @NotNull final Throwable t) {
+        validateAndFireAsync(DEBUG, format(message, t), Set.of(t));
+    }
+
+    public void debug(@NotNull String message, @NotNull final EventException e) {
+        validateAndFire(DEBUG, format(message, e), Set.of(e));
+    }
+
+    public void debugSynchronized(@NotNull String message, @NotNull final EventException e) {
+        validateAndFireSynchronized(DEBUG, format(message, e), Set.of(e));
+    }
+
+    public void debugAsync(@NotNull String message, @NotNull final EventException e) {
+        validateAndFireAsync(DEBUG, format(message, e), Set.of(e));
     }
 
     /**
@@ -413,175 +506,171 @@ public class Logger implements org.slf4j.Logger {
     @Contract(pure = true)
     @Override
     public boolean isDebugEnabled(@NotNull final Marker marker) {
-        return isLoggable(Level.DEBUG, marker);
+        return isLoggable(DEBUG, marker);
     }
 
     @Override
     public void debug(@NotNull final Marker marker, @NotNull final String message) {
-        new DebugLogEvent(this, marker, message).fire();
+        validateAndFire(DEBUG, marker, message);
     }
 
     public void debugSynchronized(@NotNull final Marker marker, @NotNull final String message) {
-        new DebugLogEvent(this, marker, message).fireSynchronized();
+        validateAndFireSynchronized(DEBUG, marker, message);
     }
 
     public void debugAsync(@NotNull final Marker marker, @NotNull final String message) {
-        new DebugLogEvent(this, marker, message).fireAsync();
+        validateAndFireAsync(DEBUG, marker, message);
     }
 
     @Override
     public void debug(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        new DebugLogEvent(this, marker, format(message, arg), arg).fire();
+        validateAndFire(DEBUG, marker, format(message,arg), Set.of(arg));
     }
 
     public void debugSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        new DebugLogEvent(this, marker, format(message, arg), arg).fireSynchronized();
+        validateAndFireSynchronized(DEBUG, marker, format(message,arg), Set.of(arg));
     }
 
     public void debugAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        new DebugLogEvent(this, marker, format(message, arg), arg).fireAsync();
+        validateAndFireAsync(DEBUG, marker, format(message,arg), Set.of(arg));
     }
 
     @Override
-    public void debug(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new DebugLogEvent(this, marker, format(message, arg1, arg2), arg1, arg2).fire();
+    public void debug(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
+        validateAndFire(DEBUG, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
     }
 
-    public void debugSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new DebugLogEvent(this, marker, format(message, arg1, arg2), arg1, arg2).fireSynchronized();
+    public void debugSynchronized(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
+        validateAndFireSynchronized(DEBUG, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
     }
 
-
-    public void debugAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new DebugLogEvent(this, marker, format(message, arg1, arg2), arg1, arg2).fireAsync();
-    }
-
-
-    @Override
-    public void debug(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... args) {
-        new DebugLogEvent(this, marker, format(message, args), args).fire();
-    }
-
-    public void debugSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... args) {
-        new DebugLogEvent(this, marker, format(message, args), args).fireSynchronized();
-    }
-
-    public void debugAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... args) {
-        new DebugLogEvent(this, marker, format(message, args), args).fireAsync();
+    public void debugAsync(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
+        validateAndFireAsync(DEBUG, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
     }
 
     @Override
-    public void debug(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        new DebugLogEvent(this, marker, format(message, t), t).fire();
+    public void debug(@NotNull final Marker marker, String message, Object... args) {
+        validateAndFire(DEBUG, marker, format(message,args), Set.of(args));
     }
 
-    public void debugSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        new DebugLogEvent(this, marker, format(message, t), t).fireSynchronized();
+    public void debugSynchronized(@NotNull final Marker marker, String message, Object... args) {
+        validateAndFireSynchronized(DEBUG, marker, format(message,args), Set.of(args));
     }
 
-    public void debugAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        new DebugLogEvent(this, marker, format(message, t), t).fireAsync();
+    public void debugAsync(@NotNull final Marker marker, String message, Object... args) {
+        validateAndFireAsync(DEBUG, marker, format(message,args), Set.of(args));
     }
 
-    public void debug(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
-        new DebugLogEvent(this, marker, format(message, e), e).fire();
+    @Override
+    public void debug(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
+        validateAndFire(DEBUG, marker, format(message,t), Set.of(t));
     }
 
-    public void debugSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
-        new DebugLogEvent(this, marker, format(message, e), e).fireSynchronized();
+    public void debugSynchronized(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
+        validateAndFireSynchronized(DEBUG, marker, format(message,t), Set.of(t));
     }
 
-    public void debugAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
-        new DebugLogEvent(this, marker, format(message, e), e).fireAsync();
+    public void debugAsync(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
+        validateAndFireAsync(DEBUG, marker, format(message,t), Set.of(t));
+    }
+
+    public void debug(@NotNull final Marker marker, String message, @NotNull final EventException e) {
+        validateAndFire(DEBUG, marker, format(message,e), Set.of(e));
+    }
+
+    public void debugSynchronized(@NotNull final Marker marker, String message, @NotNull final EventException e) {
+        validateAndFireSynchronized(DEBUG, marker, format(message,e), Set.of(e));
+    }
+
+    public void debugAsync(@NotNull final Marker marker, String message, @NotNull final EventException e) {
+        validateAndFireAsync(DEBUG, marker, format(message,e), Set.of(e));
     }
 
     /**
      * Check if log calls to Log Level {@link Level#INFO} will be logged or ignored.
-     *
      * @return True | False
      */
     @Contract(pure = true)
     @Override
     public boolean isInfoEnabled() {
-        return isLoggable(Level.INFO);
+        return isLoggable(INFO);
     }
 
     @Override
     public void info(@NotNull final String message) {
-        new InfoLogEvent(this, message).fire();
+        validateAndFire(INFO, message);
     }
 
     public void infoSynchronized(@NotNull final String message) {
-        new InfoLogEvent(this, message).fireSynchronized();
+        validateAndFireSynchronized(INFO, message);
     }
 
     public void infoAsync(@NotNull final String message) {
-        new InfoLogEvent(this, message).fireAsync();
-    }
-
-
-    @Override
-    public void info(@NotNull final String message, @NotNull final Object arg) {
-        new InfoLogEvent(this, format(message, arg), arg).fire();
-    }
-
-    public void infoSynchronized(@NotNull final String message, @NotNull final Object arg) {
-        new InfoLogEvent(this, format(message, arg), arg).fireSynchronized();
-    }
-
-    public void infoAsync(@NotNull final String message, @NotNull final Object arg) {
-        new InfoLogEvent(this, format(message, arg), arg).fireAsync();
+        validateAndFireAsync(INFO, message);
     }
 
     @Override
-    public void info(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new InfoLogEvent(this, format(message, arg1, arg2), arg1, arg2).fire();
+    public void info(@NotNull String message, @NotNull final Object arg) {
+        validateAndFire(INFO, format(message, arg), Set.of(arg));
     }
 
-    public void infoSynchronized(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new InfoLogEvent(this, format(message, arg1, arg2), arg1, arg2).fireSynchronized();
+    public void infoSynchronized(@NotNull String message, @NotNull final Object arg) {
+        validateAndFireSynchronized(INFO, format(message, arg), Set.of(arg));
     }
 
-    public void infoAsync(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new InfoLogEvent(this, format(message, arg1, arg2), arg1, arg2).fireAsync();
-    }
-
-    @Override
-    public void info(@NotNull final String message, @NotNull final Object... args) {
-        new InfoLogEvent(this, format(message, args), args).fire();
-    }
-
-    public void infoSynchronized(@NotNull final String message, @NotNull final Object... args) {
-        new InfoLogEvent(this, format(message, args), args).fireSynchronized();
-    }
-
-    public void infoAsync(@NotNull final String message, @NotNull final Object... args) {
-        new InfoLogEvent(this, format(message, args), args).fireAsync();
+    public void infoAsync(@NotNull String message, @NotNull final Object arg) {
+        validateAndFireAsync(INFO, format(message, arg), Set.of(arg));
     }
 
     @Override
-    public void info(@NotNull final String message, @NotNull final Throwable t) {
-        new InfoLogEvent(this, format(message, t), t).fire();
+    public void info(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
+        validateAndFire(INFO, format(message, arg1, arg2), Set.of(arg1, arg2));
     }
 
-    public void infoSynchronized(@NotNull final String message, @NotNull final Throwable t) {
-        new InfoLogEvent(this, format(message, t), t).fireSynchronized();
+    public void infoSynchronized(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
+        validateAndFireSynchronized(INFO, format(message, arg1, arg2), Set.of(arg1, arg2));
     }
 
-    public void infoAsync(@NotNull final String message, @NotNull final Throwable t) {
-        new InfoLogEvent(this, format(message, t), t).fireAsync();
+    public void infoAsync(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
+        validateAndFireAsync(INFO, format(message, arg1, arg2), Set.of(arg1, arg2));
     }
 
-    public void info(@NotNull final String message, @NotNull final EventException e) {
-        new InfoLogEvent(this, format(message, e), e).fire();
+    @Override
+    public void info(@NotNull String message, @NotNull final Object... args) {
+        validateAndFire(INFO, format(message, args), Set.of(args));
     }
 
-    public void infoSynchronized(@NotNull final String message, @NotNull final EventException e) {
-        new InfoLogEvent(this, format(message, e), e).fireSynchronized();
+    public void infoSynchronized(@NotNull String message, @NotNull final Object... args) {
+        validateAndFireSynchronized(INFO, format(message, args), Set.of(args));
     }
 
-    public void infoAsync(@NotNull final String message, @NotNull final EventException e) {
-        new InfoLogEvent(this, format(message, e), e).fireAsync();
+    public void infoAsync(@NotNull String message, @NotNull final Object... args) {
+        validateAndFireAsync(INFO, format(message, args), Set.of(args));
+    }
+
+    @Override
+    public void info(@NotNull String message, @NotNull final Throwable t) {
+        validateAndFire(INFO, format(message, t), Set.of(t));
+    }
+
+    public void infoSynchronized(@NotNull String message, @NotNull final Throwable t) {
+        validateAndFireSynchronized(INFO, format(message, t), Set.of(t));
+    }
+
+    public void infoAsync(@NotNull String message, @NotNull final Throwable t) {
+        validateAndFireAsync(INFO, format(message, t), Set.of(t));
+    }
+
+    public void info(@NotNull String message, @NotNull final EventException e) {
+        validateAndFire(INFO, format(message, e), Set.of(e));
+    }
+
+    public void infoSynchronized(@NotNull String message, @NotNull final EventException e) {
+        validateAndFireSynchronized(INFO, format(message, e), Set.of(e));
+    }
+
+    public void infoAsync(@NotNull String message, @NotNull final EventException e) {
+        validateAndFireAsync(INFO, format(message, e), Set.of(e));
     }
 
     /**
@@ -593,84 +682,84 @@ public class Logger implements org.slf4j.Logger {
     @Contract(pure = true)
     @Override
     public boolean isInfoEnabled(@NotNull final Marker marker) {
-        return isLoggable(Level.INFO, marker);
+        return isLoggable(INFO, marker);
     }
 
     @Override
     public void info(@NotNull final Marker marker, @NotNull final String message) {
-        new InfoLogEvent(this, marker, message).fire();
+        validateAndFire(INFO, marker, message);
     }
 
     public void infoSynchronized(@NotNull final Marker marker, @NotNull final String message) {
-        new InfoLogEvent(this, marker, message).fireSynchronized();
+        validateAndFireSynchronized(INFO, marker, message);
     }
 
     public void infoAsync(@NotNull final Marker marker, @NotNull final String message) {
-        new InfoLogEvent(this, marker, message).fireAsync();
+        validateAndFireAsync(INFO, marker, message);
     }
 
     @Override
     public void info(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        new InfoLogEvent(this, marker, format(message, arg), arg).fire();
+        validateAndFire(INFO, marker, format(message,arg), Set.of(arg));
     }
 
     public void infoSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        new InfoLogEvent(this, marker, format(message, arg), arg).fireSynchronized();
+        validateAndFireSynchronized(INFO, marker, format(message,arg), Set.of(arg));
     }
 
     public void infoAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        new InfoLogEvent(this, marker, format(message, arg), arg).fireAsync();
+        validateAndFireAsync(INFO, marker, format(message,arg), Set.of(arg));
     }
 
     @Override
-    public void info(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new InfoLogEvent(this, marker, format(message, arg1, arg2), arg1, arg2).fire();
+    public void info(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
+        validateAndFire(INFO, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
     }
 
-    public void infoSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new InfoLogEvent(this, marker, format(message, arg1, arg2), arg1, arg2).fireSynchronized();
+    public void infoSynchronized(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
+        validateAndFireSynchronized(INFO, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
     }
 
-    public void infoAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new InfoLogEvent(this, marker, format(message, arg1, arg2), arg1, arg2).fireAsync();
-    }
-
-    @Override
-    public void info(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... args) {
-        new InfoLogEvent(this, marker, format(message, args), args).fire();
-    }
-
-    public void infoSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... args) {
-        new InfoLogEvent(this, marker, format(message, args), args).fireSynchronized();
-    }
-
-    public void infoAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... args) {
-        new InfoLogEvent(this, marker, format(message, args), args).fireAsync();
+    public void infoAsync(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
+        validateAndFireAsync(INFO, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
     }
 
     @Override
-    public void info(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        new InfoLogEvent(this, marker, format(message, t), t).fire();
+    public void info(@NotNull final Marker marker, String message, Object... args) {
+        validateAndFire(INFO, marker, format(message,args), Set.of(args));
     }
 
-    public void infoSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        new InfoLogEvent(this, marker, format(message, t), t).fireSynchronized();
+    public void infoSynchronized(@NotNull final Marker marker, String message, Object... args) {
+        validateAndFireSynchronized(INFO, marker, format(message,args), Set.of(args));
     }
 
-    public void infoAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        new InfoLogEvent(this, marker, format(message, t), t).fireAsync();
+    public void infoAsync(@NotNull final Marker marker, String message, Object... args) {
+        validateAndFireAsync(INFO, marker, format(message,args), Set.of(args));
     }
 
-    public void info(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
-        new InfoLogEvent(this, marker, format(message, e), e).fire();
+    @Override
+    public void info(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
+        validateAndFire(INFO, marker, format(message,t), Set.of(t));
     }
 
-    public void infoSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
-        new InfoLogEvent(this, marker, format(message, e), e).fireSynchronized();
+    public void infoSynchronized(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
+        validateAndFireSynchronized(INFO, marker, format(message,t), Set.of(t));
     }
 
-    public void infoAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
-        new InfoLogEvent(this, marker, format(message, e), e).fireAsync();
+    public void infoAsync(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
+        validateAndFireAsync(INFO, marker, format(message,t), Set.of(t));
+    }
+
+    public void info(@NotNull final Marker marker, String message, @NotNull final EventException e) {
+        validateAndFire(INFO, marker, format(message,e), Set.of(e));
+    }
+
+    public void infoSynchronized(@NotNull final Marker marker, String message, @NotNull final EventException e) {
+        validateAndFireSynchronized(INFO, marker, format(message,e), Set.of(e));
+    }
+
+    public void infoAsync(@NotNull final Marker marker, String message, @NotNull final EventException e) {
+        validateAndFireAsync(INFO, marker, format(message,e), Set.of(e));
     }
 
     /**
@@ -691,15 +780,15 @@ public class Logger implements org.slf4j.Logger {
 
     @Override
     public void warn(@NotNull final String message) {
-        new WarningLogEvent(this, message).fire();
+        validateAndFire(WARNING, message);
     }
 
     public void warnSynchronized(@NotNull final String message) {
-        new WarningLogEvent(this, message).fireSynchronized();
+        validateAndFireSynchronized(WARNING, message);
     }
 
     public void warnAsync(@NotNull final String message) {
-        new WarningLogEvent(this, message).fireAsync();
+        validateAndFireAsync(WARNING, message);
     }
 
     public void warning(@NotNull final String message) {
@@ -716,15 +805,15 @@ public class Logger implements org.slf4j.Logger {
 
     @Override
     public void warn(@NotNull final String message, @NotNull final Object arg) {
-        new WarningLogEvent(this, format(message, arg), arg).fire();
+        validateAndFire(WARNING, format(message, arg), Set.of(arg));
     }
 
     public void warnSynchronized(@NotNull final String message, @NotNull final Object arg) {
-        new WarningLogEvent(this, format(message, arg), arg).fireSynchronized();
+        validateAndFireSynchronized(WARNING, format(message, arg), Set.of(arg));
     }
 
     public void warnAsync(@NotNull final String message, @NotNull final Object arg) {
-        new WarningLogEvent(this, format(message, arg), arg).fireAsync();
+        validateAndFireAsync(WARNING, format(message, arg), Set.of(arg));
     }
 
     public void warning(@NotNull final String message, @NotNull final Object arg) {
@@ -741,15 +830,15 @@ public class Logger implements org.slf4j.Logger {
 
     @Override
     public void warn(@NotNull final String message, @NotNull final Object... args) {
-        new WarningLogEvent(this, format(message, args), args).fire();
+        validateAndFire(WARNING, format(message, args), Set.of(args));
     }
 
     public void warnSynchronized(@NotNull final String message, @NotNull final Object... args) {
-        new WarningLogEvent(this, format(message, args), args).fireSynchronized();
+        validateAndFireSynchronized(WARNING, format(message, args), Set.of(args));
     }
 
     public void warnAsync(@NotNull final String message, @NotNull final Object... args) {
-        new WarningLogEvent(this, format(message, args), args).fireAsync();
+        validateAndFireAsync(WARNING, format(message, args), Set.of(args));
     }
 
     public void warning(@NotNull final String message, @NotNull final Object... arguments) {
@@ -766,15 +855,15 @@ public class Logger implements org.slf4j.Logger {
 
     @Override
     public void warn(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new WarningLogEvent(this, format(message, arg1, arg2), arg1, arg2).fire();
+        validateAndFire(WARNING, format(message, arg1,arg2), Set.of(arg1,arg2));
     }
 
     public void warnSynchronized(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new WarningLogEvent(this, format(message, arg1, arg2), arg1, arg2).fireSynchronized();
+        validateAndFireSynchronized(WARNING, format(message, arg1,arg2), Set.of(arg1,arg2));
     }
 
     public void warnAsync(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new WarningLogEvent(this, format(message, arg1, arg2), arg1, arg2).fireAsync();
+        validateAndFireAsync(WARNING, format(message, arg1,arg2), Set.of(arg1,arg2));
     }
 
     public void warning(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
@@ -791,15 +880,15 @@ public class Logger implements org.slf4j.Logger {
 
     @Override
     public void warn(@NotNull final String message, @NotNull final Throwable t) {
-        new WarningLogEvent(this, format(message, t), t).fire();
+        validateAndFire(WARNING, format(message, t), Set.of(t));
     }
 
     public void warnSynchronized(@NotNull final String message, @NotNull final Throwable t) {
-        new WarningLogEvent(this, format(message, t), t).fireSynchronized();
+        validateAndFireSynchronized(WARNING, format(message, t), Set.of(t));
     }
 
     public void warnAsync(@NotNull final String message, @NotNull final Throwable t) {
-        new WarningLogEvent(this, format(message, t), t).fireAsync();
+        validateAndFireAsync(WARNING, format(message, t), Set.of(t));
     }
 
     public void warning(@NotNull final String message, @NotNull final Throwable t) {
@@ -815,15 +904,15 @@ public class Logger implements org.slf4j.Logger {
     }
 
     public void warn(@NotNull final String message, @NotNull final EventException e) {
-        new WarningLogEvent(this, format(message, e), e).fire();
+        validateAndFire(WARNING, format(message, e), Set.of(e));
     }
 
     public void warnSynchronized(@NotNull final String message, @NotNull final EventException e) {
-        new WarningLogEvent(this, format(message, e), e).fireSynchronized();
+        validateAndFireSynchronized(WARNING, format(message, e), Set.of(e));
     }
 
     public void warnAsync(@NotNull final String message, @NotNull final EventException e) {
-        new WarningLogEvent(this, format(message, e), e).fireAsync();
+        validateAndFireAsync(WARNING, format(message, e), Set.of(e));
     }
 
     public void warning(@NotNull final String message, @NotNull final EventException e) {
@@ -840,7 +929,6 @@ public class Logger implements org.slf4j.Logger {
 
     /**
      * Check if log calls to Log Level {@link Level#WARNING} with the given {@link Marker} will be logged or ignored.
-     *
      * @return True, if the current Log Level is of Level Warning, or if the Marker is a registered forced marker.
      * @see Logger#registerForcedMarker(Marker)
      */
@@ -857,15 +945,15 @@ public class Logger implements org.slf4j.Logger {
 
     @Override
     public void warn(@NotNull final Marker marker, @NotNull final String message) {
-        new WarningLogEvent(this, marker, message).fire();
+        validateAndFire(WARNING, marker, message);
     }
 
     public void warnSynchronized(@NotNull final Marker marker, @NotNull final String message) {
-        new WarningLogEvent(this, marker, message).fireSynchronized();
+        validateAndFireSynchronized(WARNING, marker, message);
     }
 
     public void warnAsync(@NotNull final Marker marker, @NotNull final String message) {
-        new WarningLogEvent(this, marker, message).fireAsync();
+        validateAndFireAsync(WARNING, marker, message);
     }
 
     public void warning(@NotNull final Marker marker, @NotNull final String message) {
@@ -882,15 +970,15 @@ public class Logger implements org.slf4j.Logger {
 
     @Override
     public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        new WarningLogEvent(this, marker, format(message, arg), arg).fire();
+        validateAndFire(WARNING, marker, format(message, arg), Set.of(arg));
     }
 
     public void warnSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        new WarningLogEvent(this, marker, format(message, arg), arg).fireSynchronized();
+        validateAndFireSynchronized(WARNING, marker, format(message, arg), Set.of(arg));
     }
 
     public void warnAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        new WarningLogEvent(this, marker, format(message, arg), arg).fireAsync();
+        validateAndFireAsync(WARNING, marker, format(message, arg), Set.of(arg));
     }
 
     public void warning(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
@@ -907,15 +995,15 @@ public class Logger implements org.slf4j.Logger {
 
     @Override
     public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new WarningLogEvent(this, marker, format(message, arg1, arg2), arg1, arg2).fire();
+        validateAndFire(WARNING, marker, format(message, arg1,arg2), Set.of(arg1,arg2));
     }
 
     public void warnSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new WarningLogEvent(this, marker, format(message, arg1, arg2), arg1, arg2).fireSynchronized();
+        validateAndFireSynchronized(WARNING, marker, format(message, arg1,arg2), Set.of(arg1,arg2));
     }
 
     public void warnAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new WarningLogEvent(this, marker, format(message, arg1, arg2), arg1, arg2).fireAsync();
+        validateAndFireAsync(WARNING, marker, format(message, arg1,arg2), Set.of(arg1,arg2));
     }
 
     public void warning(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
@@ -932,15 +1020,15 @@ public class Logger implements org.slf4j.Logger {
 
     @Override
     public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... args) {
-        new WarningLogEvent(this, marker, format(message, args), args).fire();
+        validateAndFire(WARNING, marker, format(message, args), Set.of(args));
     }
 
     public void warnSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... args) {
-        new WarningLogEvent(this, marker, format(message, args), args).fireSynchronized();
+        validateAndFireSynchronized(WARNING, marker, format(message, args), Set.of(args));
     }
 
     public void warnAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... args) {
-        new WarningLogEvent(this, marker, format(message, args), args).fireAsync();
+        validateAndFireAsync(WARNING, marker, format(message, args), Set.of(args));
     }
 
     public void warning(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... arguments) {
@@ -957,15 +1045,15 @@ public class Logger implements org.slf4j.Logger {
 
     @Override
     public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        new WarningLogEvent(this, marker, format(message, t), t).fire();
+        validateAndFire(WARNING, marker, format(message, t), Set.of(t));
     }
 
     public void warnSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        new WarningLogEvent(this, marker, format(message, t), t).fireSynchronized();
+        validateAndFireSynchronized(WARNING, marker, format(message, t), Set.of(t));
     }
 
     public void warnAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        new WarningLogEvent(this, marker, format(message, t), t).fireAsync();
+        validateAndFireAsync(WARNING, marker, format(message, t), Set.of(t));
     }
 
     public void warning(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
@@ -981,15 +1069,15 @@ public class Logger implements org.slf4j.Logger {
     }
 
     public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
-        new WarningLogEvent(this, marker, format(message, e), e).fire();
+        validateAndFire(WARNING, marker, format(message, e), Set.of(e));
     }
 
     public void warnSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
-        new WarningLogEvent(this, marker, format(message, e), e).fireSynchronized();
+        validateAndFireSynchronized(WARNING, marker, format(message, e), Set.of(e));
     }
 
     public void warnAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
-        new WarningLogEvent(this, marker, format(message, e), e).fireAsync();
+        validateAndFireAsync(WARNING, marker, format(message, e), Set.of(e));
     }
 
     public void warning(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
@@ -1006,180 +1094,177 @@ public class Logger implements org.slf4j.Logger {
 
     /**
      * Check if log calls to Log Level {@link Level#ERROR} will be logged or ignored.
-     *
      * @return True | False
      */
     @Contract(pure = true)
     @Override
     public boolean isErrorEnabled() {
-        return isLoggable(Level.ERROR);
+        return isLoggable(ERROR);
     }
 
     @Override
     public void error(@NotNull final String message) {
-        new ErrorLogEvent(this, message).fire();
+        validateAndFire(ERROR, message);
     }
 
     public void errorSynchronized(@NotNull final String message) {
-        new ErrorLogEvent(this, message).fireSynchronized();
+        validateAndFireSynchronized(ERROR, message);
     }
 
     public void errorAsync(@NotNull final String message) {
-        new ErrorLogEvent(this, message).fireAsync();
+        validateAndFireAsync(ERROR, message);
     }
 
     @Override
-    public void error(@NotNull final String message, @NotNull final Object arg) {
-        new ErrorLogEvent(this, format(message, arg), arg).fire();
+    public void error(@NotNull String message, @NotNull final Object arg) {
+        validateAndFire(ERROR, format(message, arg), Set.of(arg));
     }
 
-    public void errorSynchronized(@NotNull final String message, @NotNull final Object arg) {
-        new ErrorLogEvent(this, format(message, arg), arg).fireSynchronized();
+    public void errorSynchronized(@NotNull String message, @NotNull final Object arg) {
+        validateAndFireSynchronized(ERROR, format(message, arg), Set.of(arg));
     }
 
-    public void errorAsync(@NotNull final String message, @NotNull final Object arg) {
-        new ErrorLogEvent(this, format(message, arg), arg).fireAsync();
-    }
-
-    @Override
-    public void error(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new ErrorLogEvent(this, format(message, arg1, arg2), arg1, arg2).fire();
-    }
-
-    public void errorSynchronized(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new ErrorLogEvent(this, format(message, arg1, arg2), arg1, arg2).fireSynchronized();
-    }
-
-    public void errorAsync(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new ErrorLogEvent(this, format(message, arg1, arg2), arg1, arg2).fireAsync();
-    }
-
-
-    @Override
-    public void error(@NotNull final String message, @NotNull final Object... args) {
-        new ErrorLogEvent(this, format(message, args), args).fire();
-    }
-
-    public void errorSynchronized(@NotNull final String message, @NotNull final Object... args) {
-        new ErrorLogEvent(this, format(message, args), args).fireSynchronized();
-    }
-
-    public void errorAsync(@NotNull final String message, @NotNull final Object... args) {
-        new ErrorLogEvent(this, format(message, args), args).fireAsync();
+    public void errorAsync(@NotNull String message, @NotNull final Object arg) {
+        validateAndFireAsync(ERROR, format(message, arg), Set.of(arg));
     }
 
     @Override
-    public void error(@NotNull final String message, @NotNull final Throwable t) {
-        new ErrorLogEvent(this, format(message, t), t).fire();
+    public void error(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
+        validateAndFire(ERROR, format(message, arg1, arg2), Set.of(arg1, arg2));
     }
 
-    public void errorSynchronized(@NotNull final String message, @NotNull final Throwable t) {
-        new ErrorLogEvent(this, format(message, t), t).fireSynchronized();
+    public void errorSynchronized(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
+        validateAndFireSynchronized(ERROR, format(message, arg1, arg2), Set.of(arg1, arg2));
     }
 
-    public void errorAsync(@NotNull final String message, @NotNull final Throwable t) {
-        new ErrorLogEvent(this, format(message, t), t).fireAsync();
+    public void errorAsync(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
+        validateAndFireAsync(ERROR, format(message, arg1, arg2), Set.of(arg1, arg2));
     }
 
-    public void error(@NotNull final String message, @NotNull final EventException e) {
-        new ErrorLogEvent(this, format(message, e), e).fire();
+    @Override
+    public void error(@NotNull String message, @NotNull final Object... args) {
+        validateAndFire(ERROR, format(message, args), Set.of(args));
     }
 
-    public void errorSynchronized(@NotNull final String message, @NotNull final EventException e) {
-        new ErrorLogEvent(this, format(message, e), e).fireSynchronized();
+    public void errorSynchronized(@NotNull String message, @NotNull final Object... args) {
+        validateAndFireSynchronized(ERROR, format(message, args), Set.of(args));
     }
 
-    public void errorAsync(@NotNull final String message, @NotNull final EventException e) {
-        new ErrorLogEvent(this, format(message, e), e).fireAsync();
+    public void errorAsync(@NotNull String message, @NotNull final Object... args) {
+        validateAndFireAsync(ERROR, format(message, args), Set.of(args));
+    }
+
+    @Override
+    public void error(@NotNull String message, @NotNull final Throwable t) {
+        validateAndFire(ERROR, format(message, t), Set.of(t));
+    }
+
+    public void errorSynchronized(@NotNull String message, @NotNull final Throwable t) {
+        validateAndFireSynchronized(ERROR, format(message, t), Set.of(t));
+    }
+
+    public void errorAsync(@NotNull String message, @NotNull final Throwable t) {
+        validateAndFireAsync(ERROR, format(message, t), Set.of(t));
+    }
+
+    public void error(@NotNull String message, @NotNull final EventException e) {
+        validateAndFire(ERROR, format(message, e), Set.of(e));
+    }
+
+    public void errorSynchronized(@NotNull String message, @NotNull final EventException e) {
+        validateAndFireSynchronized(ERROR, format(message, e), Set.of(e));
+    }
+
+    public void errorAsync(@NotNull String message, @NotNull final EventException e) {
+        validateAndFireAsync(ERROR, format(message, e), Set.of(e));
     }
 
     /**
      * Check if log calls to Log Level {@link Level#ERROR} with the given {@link Marker} will be logged or ignored.
-     *
      * @return True, if the current Log Level is of Level Error, or if the Marker is a registered forced marker.
      * @see Logger#registerForcedMarker(Marker)
      */
     @Contract(pure = true)
     @Override
     public boolean isErrorEnabled(@NotNull final Marker marker) {
-        return isLoggable(Level.ERROR, marker);
+        return isLoggable(ERROR, marker);
     }
 
     @Override
     public void error(@NotNull final Marker marker, @NotNull final String message) {
-        new ErrorLogEvent(this, marker, message).fire();
+        validateAndFire(ERROR, marker, message);
     }
 
     public void errorSynchronized(@NotNull final Marker marker, @NotNull final String message) {
-        new ErrorLogEvent(this, marker, message).fireSynchronized();
+        validateAndFireSynchronized(ERROR, marker, message);
     }
 
     public void errorAsync(@NotNull final Marker marker, @NotNull final String message) {
-        new ErrorLogEvent(this, marker, message).fireAsync();
+        validateAndFireAsync(ERROR, marker, message);
     }
 
     @Override
     public void error(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        new ErrorLogEvent(this, marker, format(message, arg), arg).fire();
+        validateAndFire(ERROR, marker, format(message,arg), Set.of(arg));
     }
 
     public void errorSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        new ErrorLogEvent(this, marker, format(message, arg), arg).fireSynchronized();
+        validateAndFireSynchronized(ERROR, marker, format(message,arg), Set.of(arg));
     }
 
     public void errorAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        new ErrorLogEvent(this, marker, format(message, arg), arg).fireAsync();
+        validateAndFireAsync(ERROR, marker, format(message,arg), Set.of(arg));
     }
 
     @Override
-    public void error(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new ErrorLogEvent(this, marker, format(message, arg1, arg2), arg1, arg2).fire();
+    public void error(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
+        validateAndFire(ERROR, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
     }
 
-    public void errorSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new ErrorLogEvent(this, marker, format(message, arg1, arg2), arg1, arg2).fireSynchronized();
+    public void errorSynchronized(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
+        validateAndFireSynchronized(ERROR, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
     }
 
-    public void errorAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        new ErrorLogEvent(this, marker, format(message, arg1, arg2), arg1, arg2).fireAsync();
-    }
-
-    @Override
-    public void error(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... args) {
-        new ErrorLogEvent(this, marker, format(message, args), args).fire();
-    }
-
-    public void errorSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... args) {
-        new ErrorLogEvent(this, marker, format(message, args), args).fireSynchronized();
-    }
-
-    public void errorAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... args) {
-        new ErrorLogEvent(this, marker, format(message, args), args).fireAsync();
+    public void errorAsync(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
+        validateAndFireAsync(ERROR, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
     }
 
     @Override
-    public void error(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        new ErrorLogEvent(this, marker, format(message, t), t).fire();
+    public void error(@NotNull final Marker marker, String message, Object... args) {
+        validateAndFire(ERROR, marker, format(message,args), Set.of(args));
     }
 
-    public void errorSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        new ErrorLogEvent(this, marker, format(message, t), t).fireSynchronized();
+    public void errorSynchronized(@NotNull final Marker marker, String message, Object... args) {
+        validateAndFireSynchronized(ERROR, marker, format(message,args), Set.of(args));
     }
 
-    public void errorAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        new ErrorLogEvent(this, marker, format(message, t), t).fireAsync();
+    public void errorAsync(@NotNull final Marker marker, String message, Object... args) {
+        validateAndFireAsync(ERROR, marker, format(message,args), Set.of(args));
     }
 
-    public void error(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
-        new ErrorLogEvent(this, marker, format(message, e), e).fire();
+    @Override
+    public void error(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
+        validateAndFire(ERROR, marker, format(message,t), Set.of(t));
     }
 
-    public void errorSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
-        new ErrorLogEvent(this, marker, format(message, e), e).fireSynchronized();
+    public void errorSynchronized(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
+        validateAndFireSynchronized(ERROR, marker, format(message,t), Set.of(t));
     }
 
-    public void errorAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
-        new ErrorLogEvent(this, marker, format(message, e), e).fireAsync();
+    public void errorAsync(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
+        validateAndFireAsync(ERROR, marker, format(message,t), Set.of(t));
+    }
+
+    public void error(@NotNull final Marker marker, String message, @NotNull final EventException e) {
+        validateAndFire(ERROR, marker, format(message,e), Set.of(e));
+    }
+
+    public void errorSynchronized(@NotNull final Marker marker, String message, @NotNull final EventException e) {
+        validateAndFireSynchronized(ERROR, marker, format(message,e), Set.of(e));
+    }
+
+    public void errorAsync(@NotNull final Marker marker, String message, @NotNull final EventException e) {
+        validateAndFireAsync(ERROR, marker, format(message,e), Set.of(e));
     }
 
     @Contract(pure = true)
@@ -1190,11 +1275,23 @@ public class Logger implements org.slf4j.Logger {
         for (Object arg : args) {
             if (arg instanceof EventException e) arg = e.getCause();
             switch (arg) {
+                case ErrorResponseException error -> {
+                    message = message.replaceFirst("(?<!\\n)(\\{})", Matcher.quoteReplacement("\n{}"));
+                    final StringBuilder builder = new StringBuilder();
+                    builder.append("\n").append(EXCEPTION.getColor()).append("[")
+                            .append(error.getErrorCode()).append("]:")
+                            .append(error.getErrorResponse()).append(" - ")
+                            .append(error.getMeaning()).append("\n");
+                    for (final StackTraceElement st : error.getStackTrace()) {
+                        builder.append(Level.EXCEPTION.getColor()).append(st.toString()).append("\n");
+                    }
+                    message = message.replaceFirst("\\{}", Matcher.quoteReplacement(builder.toString()));
+                }
                 case Throwable t -> {
                     final StringBuilder builder = new StringBuilder();
-                    builder.append(Level.ERROR.getColor()).append(t.getMessage()).append("\n");
+                    builder.append(Level.EXCEPTION.getColor()).append(t.getMessage()).append("\n");
                     for (final StackTraceElement st : t.getStackTrace()) {
-                        builder.append(Level.ERROR.getColor()).append(st.toString()).append("\n");
+                        builder.append(Level.EXCEPTION.getColor()).append(st.toString()).append("\n");
                     }
                     message = message.replaceFirst("\\{}", Matcher.quoteReplacement(builder.toString()));
                 }

@@ -1,6 +1,7 @@
 package dev.prodzeus.logger.event.components;
 
 import dev.prodzeus.logger.Logger;
+import dev.prodzeus.logger.event.Event;
 import dev.prodzeus.logger.event.events.exception.ExceptionEvent;
 import dev.prodzeus.logger.event.events.log.*;
 import org.jetbrains.annotations.NotNull;
@@ -17,10 +18,14 @@ public abstract class EventListener {
         this.owner = logger;
     }
 
+    public void onGenericEvent(@NotNull final Event event) {}
+
     public void onExceptionEvent(@NotNull final ExceptionEvent event) {}
 
     // Logging Events
     public void onGenericLogEvent(@NotNull final GenericLogEvent event) {}
+
+    public void onLogEvent(@NotNull final LogEvent event) {}
 
     public void onTraceLogEvent(@NotNull final TraceLogEvent event) {}
 

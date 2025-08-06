@@ -1,4 +1,4 @@
-package dev.prodzeus.logger;
+package dev.prodzeus.logger.slf4j;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

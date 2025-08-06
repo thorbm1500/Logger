@@ -1,33 +1,29 @@
 package dev.prodzeus.logger.event.events.log;
 
-import dev.prodzeus.logger.Level;
 import dev.prodzeus.logger.Logger;
-import dev.prodzeus.logger.Marker;
-import dev.prodzeus.logger.SLF4JProvider;
+import dev.prodzeus.logger.components.Level;
 import dev.prodzeus.logger.event.Event;
 import dev.prodzeus.logger.event.components.EventListener;
+import dev.prodzeus.logger.slf4j.SLF4JProvider;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Marker;
 
 import java.util.Collection;
 import java.util.Collections;
 
 public abstract class GenericLogEvent extends Event {
 
-    protected final Level level;
     protected final Throwable exception;
     protected final String rawLog;
-    protected final String log;
     protected final Collection<Object> args;
     protected final Collection<Marker> markers;
 
     protected GenericLogEvent(@NotNull final Logger logger, @NotNull final Level level, @NotNull final Collection<Marker> marker,
                               @NotNull final String log, @NotNull final Collection<Object> args) {
-        super(logger);
-        this.level = level;
+        super(logger, level, log);
         this.exception = null;
         this.rawLog = log;
-        this.log = formatLogMessage(true);
         this.args = args;
         this.markers = marker;
         for (EventListener listener : getListeners()) {
@@ -36,17 +32,18 @@ public abstract class GenericLogEvent extends Event {
     }
 
     protected GenericLogEvent(@NotNull final Throwable exception) {
-        super(SLF4JProvider.getSystem());
-        this.level = Level.EXCEPTION;
+        super(SLF4JProvider.getSystem(), Level.EXCEPTION, exception.getMessage());
         this.exception = exception;
         this.rawLog = formatException();
-        this.log = formatLogMessage(true);
         this.args = Collections.emptySet();
         this.markers = Collections.emptySet();
+        for (EventListener listener : getListeners()) {
+            fireEventSync(() -> listener.onGenericLogEvent(this));
+        }
     }
 
     private @NotNull String formatException() {
-        if (exception == null) return "Exception thrown with no cause!";
+        if (exception == null/* || exception.getCause() == null*/) return "Exception thrown with no cause!";
 
         StringBuilder log = new StringBuilder();
 
@@ -75,22 +72,17 @@ public abstract class GenericLogEvent extends Event {
         return log.toString().stripTrailing();
     }
 
-    private @NotNull String formatLogMessage(final boolean color) {
+    public static @NotNull String formatLogMessage(@NotNull final Level level, @NotNull final String message, final boolean color) {
         final StringBuilder log = new StringBuilder();
 
-        for (final String line : "".concat(color?rawLog:removeLogColors(rawLog)).split("\n")) {
+        for (final String line : "".concat(color?message:removeLogColors(message)).split("\n")) {
             log.append(color ? level.getPrefix() : level.getRawPrefix());
-
-            if (markers != null && !markers.isEmpty()) {
-                for (final Marker marker : markers) {
-                    log.append(" [").append(marker.getName()).append("]");
-                }
-            }
 
             log.append(" ");
 
             if (color) {
-                log.append("@gray@bold[@reset@white")
+                log.append("@gray@bold[@reset")
+                        .append(level.getColor())
                         .append(logger.getName())
                         .append("@gray@bold] ")
                         .append(level.getColor());
@@ -102,7 +94,7 @@ public abstract class GenericLogEvent extends Event {
         return color ? formatLogColors(log.toString().stripTrailing().concat("@reset")) : log.toString().stripTrailing();
     }
 
-    private @NotNull String formatLogColors(@NotNull final String log) {
+    protected static @NotNull String formatLogColors(@NotNull final String log) {
         String formatted = log;
         if (formatted.contains("@black")) formatted = formatted.replace("@black","\u001b[30m");
         if (formatted.contains("@gray")) formatted = formatted.replace("@gray","\u001b[38;5;240m");
@@ -123,7 +115,7 @@ public abstract class GenericLogEvent extends Event {
         return formatted;
     }
 
-    private @NotNull String removeLogColors(@NotNull final String log) {
+    protected static @NotNull String removeLogColors(@NotNull final String log) {
         String formatted = log;
         if (formatted.contains("@black")) formatted = formatted.replace("@black","");
         if (formatted.contains("@gray")) formatted = formatted.replace("@gray","");
@@ -144,28 +136,12 @@ public abstract class GenericLogEvent extends Event {
         return formatted;
     }
 
-    public boolean isException() {
-        return exception != null;
-    }
-
-    public @Nullable Throwable getException() {
-        return exception;
-    }
-
-    public @NotNull Level getLevel() {
-        return level;
-    }
-
     public @NotNull String getRawLog() {
         return rawLog;
     }
 
-    public @NotNull String getFormattedLog() {
-        return log;
-    }
-
     public @NotNull String getFormattedLogNoColor() {
-        return formatLogMessage(false);
+        return formatLogMessage(rawLog,false);
     }
 
     public @NotNull Collection<Object> getArguments() {

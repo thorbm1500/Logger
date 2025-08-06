@@ -1,14 +1,13 @@
 package dev.prodzeus.logger.event.events.log;
 
-import dev.prodzeus.logger.Level;
 import dev.prodzeus.logger.Logger;
-import dev.prodzeus.logger.Marker;
+import dev.prodzeus.logger.components.Level;
 import dev.prodzeus.logger.event.components.EventListener;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Marker;
 
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Set;
 
 public final class InfoLogEvent extends GenericLogEvent {
 
@@ -16,24 +15,12 @@ public final class InfoLogEvent extends GenericLogEvent {
         super(logger, Level.INFO, marker, log, args);
     }
 
-    public InfoLogEvent(@NotNull final Logger logger, @NotNull final org.slf4j.Marker marker, @NotNull final String log, @NotNull final Object... args) {
-        this(logger, Set.of(Marker.of(marker)), log, Set.of(args));
+    public InfoLogEvent(@NotNull final Logger logger, @NotNull final Collection<Marker> marker, @NotNull final String log) {
+        this(logger, marker, log, Collections.emptySet());
     }
 
-    public InfoLogEvent(@NotNull final Logger logger, @NotNull final org.slf4j.Marker marker, @NotNull final String log, @NotNull final Object arg) {
-        this(logger, Set.of(Marker.of(marker)), log, Set.of(arg));
-    }
-
-    public InfoLogEvent(@NotNull final Logger logger, @NotNull final String log, @NotNull final Object... arg) {
-        this(logger, Collections.emptySet(), log, Set.of(arg));
-    }
-
-    public InfoLogEvent(@NotNull final Logger logger, @NotNull final String log, @NotNull final Object arg) {
-        this(logger, Collections.emptySet(), log, Set.of(arg));
-    }
-
-    public InfoLogEvent(@NotNull final Logger logger, @NotNull final org.slf4j.Marker marker, @NotNull final String log) {
-        this(logger, Set.of(Marker.of(marker)), log, Collections.emptySet());
+    public InfoLogEvent(@NotNull final Logger logger, @NotNull final String log, @NotNull final Collection<Object> args) {
+        this(logger, Collections.emptySet(), log, args);
     }
 
     public InfoLogEvent(@NotNull final Logger logger, @NotNull final String log) {
@@ -43,21 +30,30 @@ public final class InfoLogEvent extends GenericLogEvent {
     @Override
     public void fire() {
         for (@NotNull final EventListener listener : getListeners()) {
-            fireEvent(() -> listener.onInfoLogEvent(this));
+            fireEvent(() -> {
+                listener.onInfoLogEvent(this);
+                listener.onGenericEvent(this);
+            });
         }
     }
 
     @Override
     public void fireSynchronized() {
         for (@NotNull final EventListener listener : getListeners()) {
-            fireEventSync(() -> listener.onInfoLogEvent(this));
+            fireEventSync(() -> {
+                listener.onInfoLogEvent(this);
+                listener.onGenericEvent(this);
+            });
         }
     }
 
     @Override
     public void fireAsync() {
         for (@NotNull final EventListener listener : getListeners()) {
-            fireEventAsync(() -> listener.onInfoLogEvent(this));
+            fireEventAsync(() -> {
+                listener.onInfoLogEvent(this);
+                listener.onGenericEvent(this);
+            });
         }
     }
 }

@@ -1,30 +1,44 @@
 package dev.testzeus.event;
 
 import dev.prodzeus.logger.Logger;
-import dev.prodzeus.logger.SLF4JProvider;
 import dev.prodzeus.logger.event.components.EventException;
 import dev.prodzeus.logger.event.components.EventListener;
 import dev.prodzeus.logger.event.events.log.*;
+import dev.prodzeus.logger.slf4j.SLF4JProvider;
 import org.jetbrains.annotations.NotNull;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.*;
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class EventTest {
 
+    SLF4JProvider getProvider() {
+        final SLF4JProvider provider = SLF4JProvider.get();
+        if (provider == null) fail("SLF4JProvider == null");
+        return provider;
+    }
+
+    Logger getLogger() {
+        final Logger logger = getProvider().getLoggerFactory().getLogger("dev.prodzeus.test.event");
+        if (logger == null) fail("Logger == null");
+        return logger;
+    }
+
     @Test
+    @Order(1)
     void eventCreationTest() {
-        final Logger logger = SLF4JProvider.get().getLoggerFactory().getLogger("dev.prodzeus.test");
+        System.out.println("[EVENT] New event creation test starting...");
         assertAll(
-                () -> new TraceLogEvent(logger,"Test.").fire(),
-                () -> new DebugLogEvent(logger,"Test.").fire(),
-                () -> new InfoLogEvent(logger,"Test.").fire(),
-                () -> new WarningLogEvent(logger,"Test.").fire(),
-                () -> new ErrorLogEvent(logger,"Test.").fire(),
+                () -> new TraceLogEvent(getLogger(),"Test.").fire(),
+                () -> new DebugLogEvent(getLogger(),"Test.").fire(),
+                () -> new InfoLogEvent(getLogger(),"Test.").fire(),
+                () -> new WarningLogEvent(getLogger(),"Test.").fire(),
+                () -> new ErrorLogEvent(getLogger(),"Test.").fire(),
                 () -> {
                     new EventException(new RuntimeException("Test."));
-                    SLF4JProvider.get().suppressExceptions(true);
+                    getProvider().suppressExceptions(true);
                     new EventException(new RuntimeException("Suppressed exception."));
                 },
                 () -> new ExceptionLogEvent("Test.")
@@ -32,9 +46,10 @@ class EventTest {
     }
 
     @Test
+    @Order(3)
     void genericLogEventMethodsTest() {
-        final Logger logger = SLF4JProvider.get().getLoggerFactory().getLogger("dev.prodzeus.test");
-        final GenericLogEvent event = new InfoLogEvent(logger, "Test");
+        System.out.println("[EVENT] GenericLogEvent methods test starting...");
+        final GenericLogEvent event = new InfoLogEvent(getLogger(), "Test");
         assertAll(
                 () -> assertNotNull(event.getRawLog()),
                 () -> assertNotNull(event.getFormattedLog()),
@@ -42,23 +57,28 @@ class EventTest {
                 () -> assertNotNull(event.getArguments()),
                 () -> assertNotNull(event.getMarkers()),
                 () -> assertNotNull(event.getLevel()),
-                () -> assertNotNull(event.getCaller()),
-                () -> assertNotNull(event.getRegisteredListeners())
+                () -> assertNotNull(event.getCaller())
         );
     }
 
     @Test
-    void eventListeningTest() {
-        assertAll(
-                () -> {
-                    final Logger logger = SLF4JProvider.get().getLoggerFactory().getLogger("dev.prodzeus.test");
-                    SLF4JProvider.get().registerListener(new Listener(logger));
+    @Order(2)
+    void newEventListenerTest() {
+        System.out.println("[EVENT] New listener test starting...");
+        assertAll(this::listenerTest);
+    }
 
-                    logger.info("INFO Test.");
-                    logger.trace("TRACE Test.");
-                    logger.warn("WARN Synchronized Test.");
-                }
-        );
+    void listenerTest() {
+        try {
+            final EventListener listener = new Listener(getLogger());
+            getProvider().registerListener(listener);
+
+            getLogger().info("INFO Test.");
+            getLogger().trace("TRACE Test.");
+            getLogger().warn("WARN Synchronized Test.");
+        } catch (Exception e) {
+            fail(e);
+        }
     }
 
     public static class Listener extends EventListener {

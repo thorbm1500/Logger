@@ -1,36 +1,33 @@
 package dev.prodzeus.logger.event;
 
 import dev.prodzeus.logger.Logger;
-import dev.prodzeus.logger.SLF4JProvider;
 import dev.prodzeus.logger.event.components.EventListener;
 import dev.prodzeus.logger.event.events.log.ExceptionLogEvent;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
 public final class EventManager {
 
-    private final HashSet<@NotNull EventListener> registeredListeners = new HashSet<>();
+    private static final HashSet<@NotNull EventListener> registeredListeners = new HashSet<>();
 
     public EventManager() {}
 
     /**
      * Get all listeners registered.
-     * @return An unmodifiable {@link Set<>}, that's either empty,
+     * @return An unmodifiable {@link Set}, that's either empty,
      * or containing <b>@NotNull</b> EventListeners.
      */
     public Set<@NotNull EventListener> getListeners() {
-        return Collections.unmodifiableSet(registeredListeners);
+        return new HashSet<>(registeredListeners);
     }
 
     public boolean registerListener(@NotNull final EventListener listener) {
         synchronized (registeredListeners) {
             if (!registeredListeners.isEmpty()) {
                 for (final EventListener l : registeredListeners) {
-                    if (listener.getClass().equals(SLF4JProvider.DefaultListener.class)
-                        || l.equals(listener)) return false;
+                    if (l.equals(listener)) return false;
                 }
             }
             return registeredListeners.add(listener);
@@ -48,6 +45,16 @@ public final class EventManager {
         try {
             synchronized (registeredListeners) {
                 registeredListeners.removeIf(registeredListener -> registeredListener.getOwner().equals(logger));
+            }
+        } catch (Exception e) {
+            new ExceptionLogEvent(new RuntimeException(e));
+        }
+    }
+
+    public void unregisterAll() {
+        try {
+            synchronized (registeredListeners) {
+                registeredListeners.clear();
             }
         } catch (Exception e) {
             new ExceptionLogEvent(new RuntimeException(e));
