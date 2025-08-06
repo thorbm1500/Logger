@@ -1,6 +1,7 @@
 package dev.prodzeus.logger;
 
 import dev.prodzeus.logger.event.components.EventException;
+import dev.prodzeus.logger.event.events.exception.ExceptionEvent;
 import dev.prodzeus.logger.event.events.log.*;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -1194,7 +1195,9 @@ public final class Logger implements org.slf4j.Logger {
                     for (final StackTraceElement st : t.getStackTrace()) {
                         builder.append(Level.ERROR.getColor()).append(st.toString()).append("\n");
                     }
-                    message = message.replaceFirst("\\{}", Matcher.quoteReplacement(builder.toString()));
+                    if (!message.contains("{}")) {
+                        new ExceptionLogEvent(builder.toString());
+                    } else message = message.replaceFirst("\\{}", Matcher.quoteReplacement(builder.toString()));
                 }
                 case Collection<?> c -> {
                     final StringBuilder builder = new StringBuilder();

@@ -22,6 +22,7 @@ class EventTest {
                 () -> new InfoLogEvent(logger,"Test.").fire(),
                 () -> new WarningLogEvent(logger,"Test.").fire(),
                 () -> new ErrorLogEvent(logger,"Test.").fire(),
+                () -> new ErrorLogEvent(logger,"Exception test.", new RuntimeException("Suppressed exception.")).fire(),
                 () -> {
                     new EventException(new RuntimeException("Test."));
                     SLF4JProvider.get().suppressExceptions(true);
