@@ -1189,6 +1189,9 @@ public final class Logger implements org.slf4j.Logger {
         for (Object arg : args) {
             if (arg instanceof EventException e) arg = e.getCause();
             switch (arg) {
+                case null -> {
+                    message = message.replaceFirst("\\{}", "null");
+                }
                 case Throwable t -> {
                     final StringBuilder builder = new StringBuilder();
                     builder.append(Level.ERROR.getColor()).append(t.getMessage()).append("\n");
