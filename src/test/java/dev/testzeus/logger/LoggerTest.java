@@ -1,58 +1,48 @@
 package dev.testzeus.logger;
 
+import dev.prodzeus.logger.Event;
+import dev.prodzeus.logger.Listener;
 import dev.prodzeus.logger.Logger;
-import dev.prodzeus.logger.slf4j.SLF4JProvider;
+import dev.prodzeus.logger.SLF4JProvider;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class LoggerTest {
 
     SLF4JProvider getProvider() {
-        final SLF4JProvider provider = SLF4JProvider.get();
-        if (provider == null) fail("SLF4JProvider == null");
-        return provider;
+        return SLF4JProvider.get();
     }
 
     Logger getLogger() {
-        final Logger logger = getProvider().getLoggerFactory().getLogger("dev.prodzeus.test.logger");
-        if (logger == null) fail("Logger == null");
-        return logger;
+        return getProvider().getLoggerFactory().getLogger("dev.prodzeus.test.logger");
     }
 
     @Test
-    @Order(6)
     void newSLF4JProviderTest() {
-        System.out.println("[LOG] New SLF4J Provider test starting...");
+        assertDoesNotThrow(SLF4JProvider::new);
         assertDoesNotThrow(this::getProvider);
     }
 
     @Test
-    @Order(1)
     void SLF4JProviderMethodsTest() {
-        System.out.println("[LOG] SLF4J Provider methods test starting...");
         assertAll(
                 () -> assertNotNull(getProvider().getLoggerFactory()),
                 () -> assertNotNull(getProvider().getMarkerFactory()),
                 () -> assertNotNull(getProvider().getMDCAdapter()),
-                () -> assertNotNull(getProvider().getEventManager()),
                 () -> assertNotNull(getProvider().getRequestedApiVersion())
         );
     }
 
     @Test
-    @Order(5)
     void newLoggerTest() {
-        System.out.println("[LOG] New logger creation test starting...");
         assertDoesNotThrow(this::getLogger);
     }
 
     @Test
-    @Order(2)
     void logTest() {
-        System.out.println("[LOG] Logging test starting...");
         assertAll(
                 () -> getLogger().trace("Standard."),
                 () -> getLogger().trace("Standard. @black black@reset @red red@reset @blue blue@reset reset"),
@@ -73,9 +63,7 @@ class LoggerTest {
     }
 
     @Test
-    @Order(3)
     void logTestSynchronized() {
-        System.out.println("[LOG] Synchronized logging test starting...");
         assertAll(
                 () -> getLogger().traceSynchronized("Synchronized."),
                 () -> getLogger().traceSynchronized("Synchronized. @black black@reset @red red@reset @blue blue@reset reset"),
@@ -96,9 +84,7 @@ class LoggerTest {
     }
 
     @Test
-    @Order(4)
     void logTestAsync() {
-        System.out.println("[LOG] Async logging test starting...");
         assertAll(
                 () -> getLogger().traceAsync("Async."),
                 () -> getLogger().traceAsync("Async. @black black@reset @red red@reset @blue blue@reset reset"),
@@ -116,5 +102,49 @@ class LoggerTest {
                 () -> getLogger().errorAsync("Async. @black black@reset @red red@reset @blue blue@reset reset"),
                 () -> getLogger().errorAsync("Async. {} {} {}", "Placeholder", 1, true)
         );
+    }
+
+    @Test
+    void markerTest() {
+        assertAll(
+                () -> getLogger().trace(getProvider().getMarkerFactory().getMarker("Test Marker"), "Marker test."),
+                () -> getLogger().debug(getProvider().getMarkerFactory().getMarker("Test Marker"), "Marker test."),
+                () -> getLogger().info(getProvider().getMarkerFactory().getMarker("Test Marker"), "Marker test."),
+                () -> getLogger().warn(getProvider().getMarkerFactory().getMarker("Test Marker"), "Marker test."),
+                () -> getLogger().error(getProvider().getMarkerFactory().getMarker("Test Marker"), "Marker test.")
+        );
+    }
+
+    @Test
+    void exceptionLoggingTest() {
+        assertAll(
+                () -> getLogger().trace("Exception Test. {}", new RuntimeException("Exception example.")),
+                () -> getLogger().debug("Exception Test. {}", new RuntimeException("Exception example.")),
+                () -> getLogger().info("Exception Test. {}", new RuntimeException("Exception example.")),
+                () -> getLogger().warn("Exception Test. {}", new RuntimeException("Exception example.")),
+                () -> getLogger().error("Exception Test. {}", new RuntimeException("Exception example.")),
+                () -> getLogger().info("Exception Test.", new RuntimeException("Exception example, with no placeholder."))
+        );
+    }
+
+    @Test
+    void newListenerTest() {
+        assertDoesNotThrow(() -> {
+            final Listener listener = new TestListener(getLogger()).register();
+            getLogger().info("Listener test log for manual verification.");
+            Thread.sleep(500);
+        });
+    }
+
+    static class TestListener extends Listener {
+
+        protected TestListener(@NotNull final Logger logger) {
+            super(logger);
+        }
+
+        @Override
+        public void onInfoLogEvent(@NotNull final Event event) {
+            System.out.println("From Listener: " + event.getMessage());
+        }
     }
 }

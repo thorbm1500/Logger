@@ -1,0 +1,30 @@
+plugins {
+    id 'java'
+    id 'maven-publish'
+}
+
+group = 'dev.zeus'
+version = '1.0.0'
+
+java {
+    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+    modularity.inferModulePath.set(true)
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.slf4j:slf4j-api:2.0.12'
+    implementation 'net.dv8tion:JDA:6.0.0-rc.2'
+    compileOnly 'org.jetbrains:annotations:24.1.0'
+    compileOnly 'org.projectlombok:lombok:1.18.38'
+    annotationProcessor 'org.projectlombok:lombok:1.18.38'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

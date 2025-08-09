@@ -1,1331 +1,2642 @@
 package dev.prodzeus.logger;
 
 import dev.prodzeus.logger.components.Level;
-import dev.prodzeus.logger.event.components.EventException;
-import dev.prodzeus.logger.event.events.log.*;
-import dev.prodzeus.logger.slf4j.SLF4JProvider;
-import net.dv8tion.jda.api.exceptions.ErrorResponseException;
+import dev.prodzeus.logger.internal.EventManager;
+import dev.prodzeus.logger.internal.Formatter;
+import net.dv8tion.jda.internal.utils.tuple.Pair;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Marker;
 
 import java.util.*;
-import java.util.regex.Matcher;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static dev.prodzeus.logger.components.Level.*;
 
-/**
- * A simple logger with SLF4J implementation and an Event Listening system inspired by Bukkit.
- *
- * @author prodzeus
- * @apiNote SLF4J Version: <b>2.0.12</b>
- */
-public class Logger implements org.slf4j.Logger {
+public final class Logger implements org.slf4j.Logger {
 
-    protected final String name;
-    protected Level level = INFO;
-    private final Set<Marker> forcedMarkers = new HashSet<>();
+    private static final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
+
+    private final String name;
+    private Level level = INFO;
+    private boolean ignoreGlobalLevel = false;
+
+    private static final Set<Marker> forcedMarkers = Collections.synchronizedSet(new HashSet<>());
 
     /**
-     * Constructs a new Logger instance.
-     *
-     * @param name Name of the new Logger instance.
-     * @apiNote <b>This should only be called through the LoggerFactory!</b>
-     * @see dev.prodzeus.logger.slf4j.LoggerFactory#getLogger(String) 
+     * @apiNote <b>For internal use only.</b>
      */
-    public Logger(@NotNull final String name) {
+    @Contract(pure = true)
+    Logger(@NotNull final String name) {
         this.name = name;
-        SLF4JProvider.get().getLoggerFactory().validate(this);
-        info("@greenNew Logger instance created.");
-    }
-
-    public Logger(@NotNull final Class<?> clazz) {
-        this(clazz.getName());
+        process(false,level,null,null,"@greenNew Logger instance created.",Collections.emptySet());
     }
 
     /**
-     * Register a forced {@link Marker}.
-     *
+     * Registers a Forced {@link Marker}.
+     * Forced Markers are static and thus shared across all Loggers.
      * @param marker Marker to register.
-     * @return The Logger instance.
-     * @apiNote A log with a forced marker will <b>always</b> be logged, regardless of the current {@link Level}.
+     * @return       The Logger instance.
+     * @apiNote      A log with a forced Marker will <b>always</b> be logged, regardless of the current Global and individual {@link Level}.
      */
-    public Logger registerForcedMarker(@NotNull final Marker marker) {
-        this.forcedMarkers.add(marker);
+    public @NotNull Logger registerForcedMarker(@NotNull final Marker marker) {
+        forcedMarkers.add(marker);
         return this;
     }
 
     /**
-     * Unregister a forced {@link Marker}.
-     *
+     * Unregisters a Forced {@link Marker}.
      * @param marker Marker to unregister.
-     * @return The Logger instance.
+     * @return       The Logger instance.
      */
-    public Logger unregisterForcedMarker(@NotNull final Marker marker) {
-        this.forcedMarkers.remove(marker);
+    public @NotNull Logger unregisterForcedMarker(@NotNull final Marker marker) {
+        forcedMarkers.remove(marker);
         return this;
     }
 
     /**
-     * Clear all registered forced {@link Marker}s.
-     *
+     * Clears all registered Forced {@link Marker}s.
      * @return The Logger instance.
      */
-    public Logger clearForcedMarkers() {
-        this.forcedMarkers.clear();
+    public @NotNull Logger clearForcedMarkers() {
+        forcedMarkers.clear();
         return this;
     }
 
     /**
-     * Set the current Log Level. Any log call below this level will be ignored.
-     *
-     * @param level New Log Level.
-     * @return The Logger instance.
+     * This setting dictates whether the Global level should be respected or ignored.
+     * <b>Default:</b> {@code False}
+     * @param ignore True | False
+     * @see SLF4JProvider#setGlobalLevel(Level)SLF4JProvider#setGlobalLevel
      */
-    public Logger setLevel(@NotNull final Level level) {
+    public void ignoreGlobalLogLevel(final boolean ignore) {
+        this.ignoreGlobalLevel = ignore;
+    }
+
+    /**
+     * Sets the current log level for this instance. Any log call below this level will be ignored.
+     * @param level New log level.
+     * @return The Logger instance.
+     * @see SLF4JProvider#setGlobalLevel(Level)SLF4JProvider#setGlobalLevel
+     */
+    public @NotNull Logger setLevel(@NotNull final Level level) {
         this.level = level;
-        SLF4JProvider.getSystem().setLevel(level);
         return this;
     }
 
     /**
-     * Get the current log level set.
-     * Any logs logged below this level will be ignored,
-     * unless a forced marker has been registered.
-     *
-     * @return The current Level.
-     * @see Logger#registerForcedMarker(Marker)
+     * Gets the current log level set.
+     * Any logs logged below this level will be ignored unless a registered Forced Marker is attached to the log.
+     * @return The Logger's current level.
+     * @see Logger#registerForcedMarker(Marker)Logger#registerForcedMarker
      */
     @Contract(pure = true)
     public @NotNull Level getLevel() {
         return level;
     }
 
-    public void suppressExceptions(final boolean suppress) {
-        SLF4JProvider.get().suppressExceptions(suppress);
-    }
-
     /**
-     * Check if a level is loggable.
-     *
-     * @param level The Level to check.
-     * @return True, if log calls at this level are logged to console, otherwise false.
+     * Gets the name of the instance.
+     * @return The Logger's name.
      */
-     @Contract(pure = true)
-    public boolean isLoggable(@NotNull final Level level) {
-        return isLoggable(level, null);
-    }
-
-    /**
-     * Check if a level or marker is loggable.
-     *
-     * @param marker The marker.
-     * @param level  The level.
-     * @return True, if the level is equal to or higher than the current Log Level,
-     * or if the marker is a registered forced marker, otherwise false.
-     * @see Logger#registerForcedMarker(Marker)
-     */
-    @Contract(pure = true)
-    public boolean isLoggable(final Level level, @Nullable final Marker marker) {
-        if (marker != null && forcedMarkers.contains(marker)) return true;
-        return this.level.getWeight() <= level.getWeight();
-    }
-
-    /**
-     * Get the name of the Logger instance.
-     *
-     * @return The name.
-     */
-    @Contract(pure = true)
-    @Override
+    @Override @Contract(pure = true)
     public @NotNull String getName() {
         return name;
     }
 
-    private void validateAndFire(@NotNull Level level, @NotNull final String message) {
-        validateAndFire(level, message, Collections.emptySet());
-    }
-
-    private void validateAndFire(@NotNull Level level, @NotNull final Marker marker, @NotNull final String message) {
-        validateAndFire(level, Set.of(marker), message, Collections.emptySet());
-    }
-
-    private void validateAndFire(@NotNull Level level, @NotNull final String message, @NotNull Collection<Object> args) {
-        validateAndFire(level, Collections.emptySet(), message, args);
-    }
-
-    private void validateAndFire(@NotNull Level level, @NotNull final Marker marker, @NotNull final String message, @NotNull Collection<Object> args) {
-        validateAndFire(level, Set.of(marker), message, args);
-    }
-
-    private void validateAndFire(@NotNull Level level, @NotNull Collection<Marker> markers, @NotNull final String message, @NotNull Collection<Object> args) {
-        if (args.stream().anyMatch(Throwable.class::isInstance)) {
-            new ExceptionLogEvent(this, markers, message, args).fire();
-        } else switch (level) {
-            case OFF -> {/* Ignore. */}
-            case TRACE -> new TraceLogEvent(this, markers, message, args).fire();
-            case DEBUG -> new DebugLogEvent(this, markers, message, args).fire();
-            case INFO -> new InfoLogEvent(this, markers, message, args).fire();
-            case WARNING ->  new WarningLogEvent(this, markers, message, args).fire();
-            case ERROR -> new ErrorLogEvent(this, markers, message, args).fire();
-            case ALL -> new LogEvent(this, markers, message, args);
-        }
-    }
-
-    private void validateAndFireSynchronized(@NotNull Level level, @NotNull final String message) {
-        validateAndFireSynchronized(level, message, Collections.emptySet());
-    }
-
-    private void validateAndFireSynchronized(@NotNull Level level, @NotNull final Marker marker, @NotNull final String message) {
-        validateAndFireSynchronized(level, Set.of(marker), message, Collections.emptySet());
-    }
-
-    private void validateAndFireSynchronized(@NotNull Level level, @NotNull final String message, @NotNull Collection<Object> args) {
-        validateAndFireSynchronized(level, Collections.emptySet(), message, args);
-    }
-
-    private void validateAndFireSynchronized(@NotNull Level level, @NotNull final Marker marker, @NotNull final String message, @NotNull Collection<Object> args) {
-        validateAndFireSynchronized(level, Set.of(marker), message, args);
-    }
-
-    private void validateAndFireSynchronized(@NotNull Level level, @NotNull Collection<Marker> markers, @NotNull final String message, @NotNull Collection<Object> args) {
-        if (args.stream().anyMatch(Throwable.class::isInstance)) {
-            new ExceptionLogEvent(this, markers, message, args).fireSynchronized();
-        } else switch (level) {
-            case OFF -> {/* Ignore. */}
-            case TRACE -> new TraceLogEvent(this, markers, message, args).fireSynchronized();
-            case DEBUG -> new DebugLogEvent(this, markers, message, args).fireSynchronized();
-            case INFO -> new InfoLogEvent(this, markers, message, args).fireSynchronized();
-            case WARNING ->  new WarningLogEvent(this, markers, message, args).fireSynchronized();
-            case ERROR -> new ErrorLogEvent(this, markers, message, args).fireSynchronized();
-            case ALL -> new LogEvent(this, markers, message, args);
-        }
-    }
-
-    private void validateAndFireAsync(@NotNull Level level, @NotNull final String message) {
-        validateAndFireAsync(level, message, Collections.emptySet());
-    }
-
-    private void validateAndFireAsync(@NotNull Level level, @NotNull final Marker marker, @NotNull final String message) {
-        validateAndFireAsync(level, Set.of(marker), message, Collections.emptySet());
-    }
-
-    private void validateAndFireAsync(@NotNull Level level, @NotNull final String message, @NotNull Collection<Object> args) {
-        validateAndFireAsync(level, Collections.emptySet(), message, args);
-    }
-
-    private void validateAndFireAsync(@NotNull Level level, @NotNull final Marker marker, @NotNull final String message, @NotNull Collection<Object> args) {
-        validateAndFireAsync(level, Set.of(marker), message, args);
-    }
-
-    private void validateAndFireAsync(@NotNull Level level, @NotNull Collection<Marker> markers, @NotNull final String message, @NotNull Collection<Object> args) {
-        if (args.stream().anyMatch(Throwable.class::isInstance)) {
-            new ExceptionLogEvent(this, markers, message, args).fireAsync();
-        } else switch (level) {
-            case OFF -> {/* Ignore. */}
-            case TRACE -> new TraceLogEvent(this, markers, message, args).fireAsync();
-            case DEBUG -> new DebugLogEvent(this, markers, message, args).fireAsync();
-            case INFO -> new InfoLogEvent(this, markers, message, args).fireAsync();
-            case WARNING ->  new WarningLogEvent(this, markers, message, args).fireAsync();
-            case ERROR -> new ErrorLogEvent(this, markers, message, args).fireAsync();
-            case ALL -> new LogEvent(this, markers, message, args);
-        }
+    /**
+     * Checks if a log to the specified level would be logged or ignored.
+     * @param level The log level.
+     * @return True, if logs at this level are logged, otherwise false.
+     */
+    @Contract(pure = true)
+    public boolean isLoggable(@NotNull final Level level) {
+        return ((ignoreGlobalLevel ? 0 : SLF4JProvider.getGlobalLevel().getWeight()) & this.level.getWeight()) <= level.getWeight();
     }
 
     /**
-     * Check if log calls to Log Level {@link Level#TRACE} will be logged or ignored.
-     *
-     * @return True | False
+     * Checks if a log to the specified level with the specified Marker would be logged or ignored.
+     * @param marker The Marker.
+     * @param level  The level.
+     * @return       True, if logs at this level are logged,
+     *               or if the marker is a registered Forced Marker, otherwise false.
+     * @see          Logger#registerForcedMarker(Marker)Logger#registerForcedMarker
      */
     @Contract(pure = true)
-    @Override
+    public boolean isLoggable(@NotNull final Level level, @Nullable final Marker marker) {
+        if (marker != null && forcedMarkers.contains(marker)) return true;
+        return isLoggable(level);
+    }
+
+    /**
+     * @apiNote <b>For internal use only.</b>
+     */
+    private void process(@NotNull Level level, @NotNull String message) {
+        process(level, null, null, message, Collections.emptySet());
+    }
+
+    /**
+     * @apiNote <b>For internal use only.</b>
+     */
+    private void process(@NotNull Level level, @NotNull Throwable throwable) {
+        process(level, null, throwable, "", Collections.emptySet());
+    }
+
+    /**
+     * @apiNote <b>For internal use only.</b>
+     */
+    private void process(@NotNull Level level, @NotNull String message, @NotNull final Object... args) {
+        process(level, null, null, message, Set.of(args));
+    }
+
+    /**
+     * @apiNote <b>For internal use only.</b>
+     */
+    private void process(@NotNull Level level, @Nullable final Marker marker, @NotNull String message) {
+        process(level, marker, null, message, Collections.emptySet());
+    }
+
+    /**
+     * @apiNote <b>For internal use only.</b>
+     */
+    private void process(@NotNull Level level, @Nullable final Marker marker, @NotNull Throwable throwable) {
+        process(level, marker, throwable, "", Collections.emptySet());
+    }
+
+    /**
+     * @apiNote <b>For internal use only.</b>
+     */
+    private void process(@NotNull Level level, @Nullable final Marker marker, @NotNull String message, @NotNull final Object... args) {
+        process(level, marker, null, message, Set.of(args));
+    }
+
+    /**
+     * @apiNote <b>For internal use only.</b>
+     */
+    private void process(@NotNull Level level, @Nullable final Marker marker, @Nullable final Throwable throwable, @NotNull String message, @NotNull final Object... args) {
+        process(level, marker, throwable, message, Set.of(args));
+    }
+
+    /**
+     * @apiNote <b>For internal use only.</b>
+     */
+    private void process(@NotNull Level level, @Nullable final Marker marker, @Nullable final Throwable throwable, @NotNull String message, @NotNull final Collection<Object> args) {
+        process(true,level,marker,throwable,message,args);
+    }
+
+    /**
+     * @apiNote <b>For internal use only.</b>
+     */
+    private void process(final boolean fireEvent, @NotNull Level level, @Nullable final Marker marker, @Nullable final Throwable throwable, @NotNull String message, @NotNull final Collection<Object> args) {
+        final Collection<Object> arguments = new HashSet<>(args);
+        if (throwable != null) arguments.add(throwable);
+        final Pair<String, Level> formatted = Formatter.formatPlaceholders(message,arguments);
+        if (formatted.getRight() == EXCEPTION) {
+            level = EXCEPTION;
+            System.out.flush();
+        }
+        final String rawMessage = formatted.getLeft();
+        message = Formatter.constructLogMessage(this, level, marker, rawMessage, true);
+        if (fireEvent) EventManager.handleEvent(new Event(this,level,marker,throwable,rawMessage,message,arguments));
+        if (isLoggable(level)) System.out.println(message);
+    }
+
+    /**
+     * Checks if logs at {@link Level#TRACE TRACE} level are logged or ignored.
+     * <p>
+     *     No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
+     *     The expected format of placeholders;
+     *      <pre>
+     *          {@code logger.trace("Example {}.", Object);}
+     *      </pre>
+     * </p>
+     * @return True | False
+     */
+    @Override @Contract(pure = true)
     public boolean isTraceEnabled() {
         return isLoggable(Level.TRACE);
     }
 
+    /**
+     * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
     @Override
     public void trace(@NotNull final String message) {
-        validateAndFire(TRACE, message);
-    }
-
-    public void traceSynchronized(@NotNull final String message) {
-        validateAndFireSynchronized(TRACE, message);
-    }
-
-    public void traceAsync(@NotNull final String message) {
-        validateAndFireAsync(TRACE, message);
-    }
-
-    @Override
-    public void trace(@NotNull String message, @NotNull final Object arg) {
-        validateAndFire(TRACE, format(message, arg), Set.of(arg));
-    }
-
-    public void traceSynchronized(@NotNull String message, @NotNull final Object arg) {
-        validateAndFireSynchronized(TRACE, format(message, arg), Set.of(arg));
-    }
-
-    public void traceAsync(@NotNull String message, @NotNull final Object arg) {
-        validateAndFireAsync(TRACE, format(message, arg), Set.of(arg));
-    }
-
-    @Override
-    public void trace(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
-        validateAndFire(TRACE, format(message, arg1, arg2), Set.of(arg1, arg2));
-    }
-
-    public void traceSynchronized(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
-        validateAndFireSynchronized(TRACE, format(message, arg1, arg2), Set.of(arg1, arg2));
-    }
-
-    public void traceAsync(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
-        validateAndFireAsync(TRACE, format(message, arg1, arg2), Set.of(arg1, arg2));
-    }
-
-    @Override
-    public void trace(@NotNull String message, @NotNull final Object... args) {
-        validateAndFire(TRACE, format(message, args), Set.of(args));
-    }
-
-    public void traceSynchronized(@NotNull String message, @NotNull final Object... args) {
-        validateAndFireSynchronized(TRACE, format(message, args), Set.of(args));
-    }
-
-    public void traceAsync(@NotNull String message, @NotNull final Object... args) {
-        validateAndFireAsync(TRACE, format(message, args), Set.of(args));
-    }
-
-    @Override
-    public void trace(@NotNull String message, @NotNull final Throwable t) {
-        validateAndFire(TRACE, format(message, t), Set.of(t));
-    }
-
-    public void traceSynchronized(@NotNull String message, @NotNull final Throwable t) {
-        validateAndFireSynchronized(TRACE, format(message, t), Set.of(t));
-    }
-
-    public void traceAsync(@NotNull String message, @NotNull final Throwable t) {
-        validateAndFireAsync(TRACE, format(message, t), Set.of(t));
-    }
-
-    public void trace(@NotNull String message, @NotNull final EventException e) {
-        validateAndFire(TRACE, format(message, e), Set.of(e));
-    }
-
-    public void traceSynchronized(@NotNull String message, @NotNull final EventException e) {
-        validateAndFireSynchronized(TRACE, format(message, e), Set.of(e));
-    }
-
-    public void traceAsync(@NotNull String message, @NotNull final EventException e) {
-        validateAndFireAsync(TRACE, format(message, e), Set.of(e));
+         process(TRACE,message);
     }
 
     /**
-     * Check if log calls to Log Level {@link Level#TRACE} with the given {@link Marker} will be logged or ignored.
-     *
-     * @return True, if the current Log Level is of Level Trace, or if the Marker is a registered forced marker.
-     * @see Logger#registerForcedMarker(Marker)
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
      */
-    @Contract(pure = true)
+    public synchronized void traceSynchronized(@NotNull final String message) {
+        trace(message);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public void traceAsync(@NotNull final String message) {
+        executor.submit(() -> trace(message));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
     @Override
+    public void trace(@NotNull final String message, final Object arg) {
+        process(TRACE,message,arg);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public synchronized void traceSynchronized(@NotNull final String message, final Object arg) {
+        trace(message,arg);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public void traceAsync(@NotNull final String message, final Object arg) {
+        executor.submit(() -> trace(message,arg));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    @Override
+    public void trace(@NotNull final String message, final Object arg1, final Object arg2) {
+        process(TRACE,message,arg1,arg2);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public synchronized void traceSynchronized(@NotNull final String message, final Object arg1, final Object arg2) {
+        trace(message,arg1,arg2);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public void traceAsync(@NotNull final String message, final Object arg1, final Object arg2) {
+        executor.submit(() -> trace(message,arg1,arg2));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    @Override
+    public void trace(@NotNull final String message, Object... args) {
+        process(TRACE,message,args);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public synchronized void traceSynchronized(@NotNull final String message, Object... args) {
+        trace(message,args);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public void traceAsync(@NotNull final String message, Object... args) {
+        executor.submit(() -> trace(message,args));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    @Override
+    public void trace(@NotNull final String message, @NotNull final Throwable t) {
+        process(TRACE,message,t);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public synchronized void traceSynchronized(@NotNull final String message, @NotNull final Throwable t) {
+        trace(message,t);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public void traceAsync(@NotNull final String message, @NotNull final Throwable t) {
+        executor.submit(() -> trace(message,t));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param t Throwable to log.
+     * @apiNote Events are still triggered even if the message is not logged due to the current log level.
+     * @see     Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public void trace(@NotNull final Throwable t) {
+        process(TRACE,t);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param t Throwable to log.
+     * @apiNote Events are still triggered even if the message is not logged due to the current log level.
+     * @see     Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public synchronized void traceSynchronized(@NotNull final Throwable t) {
+        trace(t);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param t Throwable to log.
+     * @apiNote Events are still triggered even if the message is not logged due to the current log level.
+     * @see     Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public void traceAsync(@NotNull final Throwable t) {
+        executor.submit(() -> trace(t));
+    }
+
+    /**
+     * Checks if logs at {@link Level#TRACE TRACE} level, with the specified Marker, are logged or ignored.
+     * <p>
+     *     No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
+     *     The expected format of placeholders;
+     *      <pre>
+     *          {@code logger.trace("Example {}.", Object);}
+     *      </pre>
+     * </p>
+     * @return True | False
+     */
+    @Override @Contract(pure = true)
     public boolean isTraceEnabled(@NotNull final Marker marker) {
         return isLoggable(Level.TRACE, marker);
     }
 
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
     @Override
-    public void trace(@NotNull final Marker marker, @NotNull final String message) {
-        validateAndFire(TRACE, marker, message);
-    }
-
-    public void traceSynchronized(@NotNull final Marker marker, @NotNull final String message) {
-        validateAndFireSynchronized(TRACE, marker, message);
-    }
-
-    public void traceAsync(@NotNull final Marker marker, @NotNull final String message) {
-        validateAndFireAsync(TRACE, marker, message);
-    }
-
-    @Override
-    public void trace(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        validateAndFire(TRACE, marker, format(message,arg), Set.of(arg));
-    }
-
-    public void traceSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        validateAndFireSynchronized(TRACE, marker, format(message,arg), Set.of(arg));
-    }
-
-    public void traceAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        validateAndFireAsync(TRACE, marker, format(message,arg), Set.of(arg));
-    }
-
-    @Override
-    public void trace(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        validateAndFire(TRACE, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
-    }
-
-    public void traceSynchronized(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        validateAndFireSynchronized(TRACE, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
-    }
-
-    public void traceAsync(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        validateAndFireAsync(TRACE, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
-    }
-
-    @Override
-    public void trace(@NotNull final Marker marker, String message, Object... args) {
-        validateAndFire(TRACE, marker, format(message,args), Set.of(args));
-    }
-
-    public void traceSynchronized(@NotNull final Marker marker, String message, Object... args) {
-        validateAndFireSynchronized(TRACE, marker, format(message,args), Set.of(args));
-    }
-
-    public void traceAsync(@NotNull final Marker marker, String message, Object... args) {
-        validateAndFireAsync(TRACE, marker, format(message,args), Set.of(args));
-    }
-
-    @Override
-    public void trace(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
-        validateAndFire(TRACE, marker, format(message,t), Set.of(t));
-    }
-
-    public void traceSynchronized(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
-        validateAndFireSynchronized(TRACE, marker, format(message,t), Set.of(t));
-    }
-
-    public void traceAsync(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
-        validateAndFireAsync(TRACE, marker, format(message,t), Set.of(t));
-    }
-
-    public void trace(@NotNull final Marker marker, String message, @NotNull final EventException e) {
-        validateAndFire(TRACE, marker, format(message,e), Set.of(e));
-    }
-
-    public void traceSynchronized(@NotNull final Marker marker, String message, @NotNull final EventException e) {
-        validateAndFireSynchronized(TRACE, marker, format(message,e), Set.of(e));
-    }
-
-    public void traceAsync(@NotNull final Marker marker, String message, @NotNull final EventException e) {
-        validateAndFireAsync(TRACE, marker, format(message,e), Set.of(e));
+    public void trace(@Nullable final Marker marker, @NotNull final String message) {
+        process(TRACE,marker,message);
     }
 
     /**
-     * Check if log calls to Log Level {@link Level#DEBUG} will be logged or ignored.
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public synchronized void traceSynchronized(@Nullable final Marker marker, @NotNull final String message) {
+        trace(marker,message);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public void traceAsync(@Nullable final Marker marker, @NotNull final String message) {
+        executor.submit(() -> trace(marker,message));
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    @Override
+    public void trace(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
+        process(TRACE,marker,message,arg);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public synchronized void traceSynchronized(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
+        trace(marker,message,arg);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public void traceAsync(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
+        executor.submit(() -> trace(marker,message,arg));
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    @Override
+    public void trace(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
+        process(TRACE,marker,message,arg1,arg2);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public synchronized void traceSynchronized(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
+        trace(marker,message,arg1,arg2);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public void traceAsync(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
+        executor.submit(() -> trace(marker,message,arg1,arg2));
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    @Override
+    public void trace(@NotNull final Marker marker, @NotNull final String message, Object... args) {
+        process(TRACE,marker,message,args);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public synchronized void traceSynchronized(@NotNull final Marker marker, @NotNull final String message, Object... args) {
+        trace(marker,message,args);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public void traceAsync(@NotNull final Marker marker, @NotNull final String message, Object... args) {
+        executor.submit(() -> trace(marker,message,args));
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    @Override
+    public void trace(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
+        process(TRACE,marker,t,message);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public synchronized void traceSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
+        trace(marker,message,t);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public void traceAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
+        executor.submit(() -> trace(marker,message,t));
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param t      Throwable to log.
+     * @param marker The Marker to attach.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     * @see          Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public void trace(@NotNull final Marker marker, @NotNull final Throwable t) {
+        process(TRACE,marker,t);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param t      Throwable to log.
+     * @param marker The Marker to attach.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     * @see          Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public synchronized void traceSynchronized(@NotNull final Marker marker, @NotNull final Throwable t) {
+        trace(marker,t);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
+     * @param t      Throwable to log.
+     * @param marker The Marker to attach.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     * @see          Logger#isTraceEnabled()Logger#isTraceEnabled
+     */
+    public void traceAsync(@NotNull final Marker marker, @NotNull final Throwable t) {
+        executor.submit(() -> trace(marker,t));
+    }
+
+    /**
+     * Checks if logs at {@link Level#DEBUG DEBUG} level are logged or ignored.
+     * <p>
+     *     No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
+     *     The expected format of placeholders;
+     *      <pre>
+     *          {@code logger.debug("Example {}.", Object);}
+     *      </pre>
+     * </p>
      * @return True | False
      */
-    @Contract(pure = true)
-    @Override
+    @Override @Contract(pure = true)
     public boolean isDebugEnabled() {
         return isLoggable(DEBUG);
     }
 
+    /**
+     * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
     @Override
     public void debug(@NotNull final String message) {
-        validateAndFire(DEBUG, message);
-    }
-
-    public void debugSynchronized(@NotNull final String message) {
-        validateAndFireSynchronized(DEBUG, message);
-    }
-
-    public void debugAsync(@NotNull final String message) {
-        validateAndFireAsync(DEBUG, message);
-    }
-
-    @Override
-    public void debug(@NotNull String message, @NotNull final Object arg) {
-        validateAndFire(DEBUG, format(message, arg), Set.of(arg));
-    }
-
-    public void debugSynchronized(@NotNull String message, @NotNull final Object arg) {
-        validateAndFireSynchronized(DEBUG, format(message, arg), Set.of(arg));
-    }
-
-    public void debugAsync(@NotNull String message, @NotNull final Object arg) {
-        validateAndFireAsync(DEBUG, format(message, arg), Set.of(arg));
-    }
-
-    @Override
-    public void debug(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
-        validateAndFire(DEBUG, format(message, arg1, arg2), Set.of(arg1, arg2));
-    }
-
-    public void debugSynchronized(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
-        validateAndFireSynchronized(DEBUG, format(message, arg1, arg2), Set.of(arg1, arg2));
-    }
-
-    public void debugAsync(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
-        validateAndFireAsync(DEBUG, format(message, arg1, arg2), Set.of(arg1, arg2));
-    }
-
-    @Override
-    public void debug(@NotNull String message, @NotNull final Object... args) {
-        validateAndFire(DEBUG, format(message, args), Set.of(args));
-    }
-
-    public void debugSynchronized(@NotNull String message, @NotNull final Object... args) {
-        validateAndFireSynchronized(DEBUG, format(message, args), Set.of(args));
-    }
-
-    public void debugAsync(@NotNull String message, @NotNull final Object... args) {
-        validateAndFireAsync(DEBUG, format(message, args), Set.of(args));
-    }
-
-    @Override
-    public void debug(@NotNull String message, @NotNull final Throwable t) {
-        validateAndFire(DEBUG, format(message, t), Set.of(t));
-    }
-
-    public void debugSynchronized(@NotNull String message, @NotNull final Throwable t) {
-        validateAndFireSynchronized(DEBUG, format(message, t), Set.of(t));
-    }
-
-    public void debugAsync(@NotNull String message, @NotNull final Throwable t) {
-        validateAndFireAsync(DEBUG, format(message, t), Set.of(t));
-    }
-
-    public void debug(@NotNull String message, @NotNull final EventException e) {
-        validateAndFire(DEBUG, format(message, e), Set.of(e));
-    }
-
-    public void debugSynchronized(@NotNull String message, @NotNull final EventException e) {
-        validateAndFireSynchronized(DEBUG, format(message, e), Set.of(e));
-    }
-
-    public void debugAsync(@NotNull String message, @NotNull final EventException e) {
-        validateAndFireAsync(DEBUG, format(message, e), Set.of(e));
+        process(DEBUG,message);
     }
 
     /**
-     * Check if log calls to Log Level {@link Level#DEBUG} with the given {@link Marker} will be logged or ignored.
-     *
-     * @return True, if the current Log Level is of Level Debug, or if the Marker is a registered forced marker.
-     * @see Logger#registerForcedMarker(Marker)
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
      */
-    @Contract(pure = true)
-    @Override
-    public boolean isDebugEnabled(@NotNull final Marker marker) {
-        return isLoggable(DEBUG, marker);
-    }
-
-    @Override
-    public void debug(@NotNull final Marker marker, @NotNull final String message) {
-        validateAndFire(DEBUG, marker, message);
-    }
-
-    public void debugSynchronized(@NotNull final Marker marker, @NotNull final String message) {
-        validateAndFireSynchronized(DEBUG, marker, message);
-    }
-
-    public void debugAsync(@NotNull final Marker marker, @NotNull final String message) {
-        validateAndFireAsync(DEBUG, marker, message);
-    }
-
-    @Override
-    public void debug(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        validateAndFire(DEBUG, marker, format(message,arg), Set.of(arg));
-    }
-
-    public void debugSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        validateAndFireSynchronized(DEBUG, marker, format(message,arg), Set.of(arg));
-    }
-
-    public void debugAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        validateAndFireAsync(DEBUG, marker, format(message,arg), Set.of(arg));
-    }
-
-    @Override
-    public void debug(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        validateAndFire(DEBUG, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
-    }
-
-    public void debugSynchronized(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        validateAndFireSynchronized(DEBUG, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
-    }
-
-    public void debugAsync(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        validateAndFireAsync(DEBUG, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
-    }
-
-    @Override
-    public void debug(@NotNull final Marker marker, String message, Object... args) {
-        validateAndFire(DEBUG, marker, format(message,args), Set.of(args));
-    }
-
-    public void debugSynchronized(@NotNull final Marker marker, String message, Object... args) {
-        validateAndFireSynchronized(DEBUG, marker, format(message,args), Set.of(args));
-    }
-
-    public void debugAsync(@NotNull final Marker marker, String message, Object... args) {
-        validateAndFireAsync(DEBUG, marker, format(message,args), Set.of(args));
-    }
-
-    @Override
-    public void debug(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
-        validateAndFire(DEBUG, marker, format(message,t), Set.of(t));
-    }
-
-    public void debugSynchronized(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
-        validateAndFireSynchronized(DEBUG, marker, format(message,t), Set.of(t));
-    }
-
-    public void debugAsync(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
-        validateAndFireAsync(DEBUG, marker, format(message,t), Set.of(t));
-    }
-
-    public void debug(@NotNull final Marker marker, String message, @NotNull final EventException e) {
-        validateAndFire(DEBUG, marker, format(message,e), Set.of(e));
-    }
-
-    public void debugSynchronized(@NotNull final Marker marker, String message, @NotNull final EventException e) {
-        validateAndFireSynchronized(DEBUG, marker, format(message,e), Set.of(e));
-    }
-
-    public void debugAsync(@NotNull final Marker marker, String message, @NotNull final EventException e) {
-        validateAndFireAsync(DEBUG, marker, format(message,e), Set.of(e));
+    public synchronized void debugSynchronized(@NotNull final String message) {
+        debug(message);
     }
 
     /**
-     * Check if log calls to Log Level {@link Level#INFO} will be logged or ignored.
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public void debugAsync(@NotNull final String message) {
+        executor.submit(() -> debug(message));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    @Override
+    public void debug(@NotNull final String message, final Object arg) {
+        process(DEBUG,message,arg);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public synchronized void debugSynchronized(@NotNull final String message, final Object arg) {
+        debug(message,arg);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public void debugAsync(@NotNull final String message, final Object arg) {
+        executor.submit(() -> debug(message,arg));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    @Override
+    public void debug(@NotNull final String message, final Object arg1, final Object arg2) {
+        process(DEBUG,message,arg1,arg2);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public synchronized void debugSynchronized(@NotNull final String message, final Object arg1, final Object arg2) {
+        debug(message,arg1,arg2);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public void debugAsync(@NotNull final String message, final Object arg1, final Object arg2) {
+        executor.submit(() -> debug(message,arg1,arg2));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    @Override
+    public void debug(@NotNull final String message, Object... args) {
+        process(DEBUG,message,args);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public synchronized void debugSynchronized(@NotNull final String message, Object... args) {
+        debug(message,args);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public void debugAsync(@NotNull final String message, Object... args) {
+        executor.submit(() -> debug(message,args));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    @Override
+    public void debug(@NotNull final String message, @NotNull final Throwable t) {
+        process(DEBUG,message,t);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public synchronized void debugSynchronized(@NotNull final String message, @NotNull final Throwable t) {
+        debug(message,t);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public void debugAsync(@NotNull final String message, @NotNull final Throwable t) {
+        executor.submit(() -> debug(message,t));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param t Throwable to log.
+     * @apiNote Events are still triggered even if the message is not logged due to the current log level.
+     * @see     Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public void debug(@NotNull final Throwable t) {
+        process(DEBUG,t);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param t Throwable to log.
+     * @apiNote Events are still triggered even if the message is not logged due to the current log level.
+     * @see     Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public synchronized void debugSynchronized(@NotNull final Throwable t) {
+        debug(t);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param t Throwable to log.
+     * @apiNote Events are still triggered even if the message is not logged due to the current log level.
+     * @see     Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public void debugAsync(@NotNull final Throwable t) {
+        executor.submit(() -> debug(t));
+    }
+
+    /**
+     * Checks if logs at {@link Level#DEBUG DEBUG} level, with the specified Marker, are logged or ignored.
+     * <p>
+     *     No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
+     *     The expected format of placeholders;
+     *      <pre>
+     *          {@code logger.debug("Example {}.", Object);}
+     *      </pre>
+     * </p>
      * @return True | False
      */
-    @Contract(pure = true)
-    @Override
-    public boolean isInfoEnabled() {
-        return isLoggable(INFO);
+    @Override @Contract(pure = true)
+    public boolean isDebugEnabled(@NotNull final Marker marker) {
+        return isLoggable(Level.DEBUG, marker);
     }
 
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    @Override
+    public void debug(@Nullable final Marker marker, @NotNull final String message) {
+        process(DEBUG,marker,message);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public synchronized void debugSynchronized(@Nullable final Marker marker, @NotNull final String message) {
+        debug(marker,message);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public void debugAsync(@Nullable final Marker marker, @NotNull final String message) {
+        executor.submit(() -> debug(marker,message));
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    @Override
+    public void debug(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
+        process(DEBUG,marker,message,arg);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public synchronized void debugSynchronized(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
+        debug(marker,message,arg);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public void debugAsync(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
+        executor.submit(() -> debug(marker,message,arg));
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    @Override
+    public void debug(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
+        process(DEBUG,marker,message,arg1,arg2);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public synchronized void debugSynchronized(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
+        debug(marker,message,arg1,arg2);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public void debugAsync(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
+        executor.submit(() -> debug(marker,message,arg1,arg2));
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    @Override
+    public void debug(@NotNull final Marker marker, @NotNull final String message, Object... args) {
+        process(DEBUG,marker,message,args);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public synchronized void debugSynchronized(@NotNull final Marker marker, @NotNull final String message, Object... args) {
+        debug(marker,message,args);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public void debugAsync(@NotNull final Marker marker, @NotNull final String message, Object... args) {
+        executor.submit(() -> debug(marker,message,args));
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    @Override
+    public void debug(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
+        process(DEBUG,marker,t,message);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public synchronized void debugSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
+        debug(marker,message,t);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public void debugAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
+        executor.submit(() -> debug(marker,message,t));
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param t      Throwable to log.
+     * @param marker The Marker to attach.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     * @see          Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public void debug(@NotNull final Marker marker, @NotNull final Throwable t) {
+        process(DEBUG,marker,t);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param t      Throwable to log.
+     * @param marker The Marker to attach.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     * @see          Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public synchronized void debugSynchronized(@NotNull final Marker marker, @NotNull final Throwable t) {
+        debug(marker,t);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
+     * @param t      Throwable to log.
+     * @param marker The Marker to attach.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     * @see          Logger#isDebugEnabled()Logger#isDebugEnabled
+     */
+    public void debugAsync(@NotNull final Marker marker, @NotNull final Throwable t) {
+        executor.submit(() -> debug(marker,t));
+    }
+
+    /**
+     * Checks if logs at {@link Level#INFO INFO} level are logged or ignored.
+     * <p>
+     *     No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
+     *     The expected format of placeholders;
+     *      <pre>
+     *          {@code logger.info("Example {}.", Object);}
+     *      </pre>
+     * </p>
+     * @return True | False
+     */
+    @Override @Contract(pure = true)
+    public boolean isInfoEnabled() {
+        return isLoggable(Level.INFO);
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
     @Override
     public void info(@NotNull final String message) {
-        validateAndFire(INFO, message);
-    }
-
-    public void infoSynchronized(@NotNull final String message) {
-        validateAndFireSynchronized(INFO, message);
-    }
-
-    public void infoAsync(@NotNull final String message) {
-        validateAndFireAsync(INFO, message);
-    }
-
-    @Override
-    public void info(@NotNull String message, @NotNull final Object arg) {
-        validateAndFire(INFO, format(message, arg), Set.of(arg));
-    }
-
-    public void infoSynchronized(@NotNull String message, @NotNull final Object arg) {
-        validateAndFireSynchronized(INFO, format(message, arg), Set.of(arg));
-    }
-
-    public void infoAsync(@NotNull String message, @NotNull final Object arg) {
-        validateAndFireAsync(INFO, format(message, arg), Set.of(arg));
-    }
-
-    @Override
-    public void info(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
-        validateAndFire(INFO, format(message, arg1, arg2), Set.of(arg1, arg2));
-    }
-
-    public void infoSynchronized(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
-        validateAndFireSynchronized(INFO, format(message, arg1, arg2), Set.of(arg1, arg2));
-    }
-
-    public void infoAsync(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
-        validateAndFireAsync(INFO, format(message, arg1, arg2), Set.of(arg1, arg2));
-    }
-
-    @Override
-    public void info(@NotNull String message, @NotNull final Object... args) {
-        validateAndFire(INFO, format(message, args), Set.of(args));
-    }
-
-    public void infoSynchronized(@NotNull String message, @NotNull final Object... args) {
-        validateAndFireSynchronized(INFO, format(message, args), Set.of(args));
-    }
-
-    public void infoAsync(@NotNull String message, @NotNull final Object... args) {
-        validateAndFireAsync(INFO, format(message, args), Set.of(args));
-    }
-
-    @Override
-    public void info(@NotNull String message, @NotNull final Throwable t) {
-        validateAndFire(INFO, format(message, t), Set.of(t));
-    }
-
-    public void infoSynchronized(@NotNull String message, @NotNull final Throwable t) {
-        validateAndFireSynchronized(INFO, format(message, t), Set.of(t));
-    }
-
-    public void infoAsync(@NotNull String message, @NotNull final Throwable t) {
-        validateAndFireAsync(INFO, format(message, t), Set.of(t));
-    }
-
-    public void info(@NotNull String message, @NotNull final EventException e) {
-        validateAndFire(INFO, format(message, e), Set.of(e));
-    }
-
-    public void infoSynchronized(@NotNull String message, @NotNull final EventException e) {
-        validateAndFireSynchronized(INFO, format(message, e), Set.of(e));
-    }
-
-    public void infoAsync(@NotNull String message, @NotNull final EventException e) {
-        validateAndFireAsync(INFO, format(message, e), Set.of(e));
+        process(INFO,message);
     }
 
     /**
-     * Check if log calls to Log Level {@link Level#INFO} with the given {@link Marker} will be logged or ignored.
-     *
-     * @return True, if the current Log Level is of Level Info, or if the Marker is a registered forced marker.
-     * @see Logger#registerForcedMarker(Marker)
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
      */
-    @Contract(pure = true)
-    @Override
-    public boolean isInfoEnabled(@NotNull final Marker marker) {
-        return isLoggable(INFO, marker);
-    }
-
-    @Override
-    public void info(@NotNull final Marker marker, @NotNull final String message) {
-        validateAndFire(INFO, marker, message);
-    }
-
-    public void infoSynchronized(@NotNull final Marker marker, @NotNull final String message) {
-        validateAndFireSynchronized(INFO, marker, message);
-    }
-
-    public void infoAsync(@NotNull final Marker marker, @NotNull final String message) {
-        validateAndFireAsync(INFO, marker, message);
-    }
-
-    @Override
-    public void info(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        validateAndFire(INFO, marker, format(message,arg), Set.of(arg));
-    }
-
-    public void infoSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        validateAndFireSynchronized(INFO, marker, format(message,arg), Set.of(arg));
-    }
-
-    public void infoAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        validateAndFireAsync(INFO, marker, format(message,arg), Set.of(arg));
-    }
-
-    @Override
-    public void info(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        validateAndFire(INFO, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
-    }
-
-    public void infoSynchronized(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        validateAndFireSynchronized(INFO, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
-    }
-
-    public void infoAsync(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        validateAndFireAsync(INFO, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
-    }
-
-    @Override
-    public void info(@NotNull final Marker marker, String message, Object... args) {
-        validateAndFire(INFO, marker, format(message,args), Set.of(args));
-    }
-
-    public void infoSynchronized(@NotNull final Marker marker, String message, Object... args) {
-        validateAndFireSynchronized(INFO, marker, format(message,args), Set.of(args));
-    }
-
-    public void infoAsync(@NotNull final Marker marker, String message, Object... args) {
-        validateAndFireAsync(INFO, marker, format(message,args), Set.of(args));
-    }
-
-    @Override
-    public void info(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
-        validateAndFire(INFO, marker, format(message,t), Set.of(t));
-    }
-
-    public void infoSynchronized(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
-        validateAndFireSynchronized(INFO, marker, format(message,t), Set.of(t));
-    }
-
-    public void infoAsync(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
-        validateAndFireAsync(INFO, marker, format(message,t), Set.of(t));
-    }
-
-    public void info(@NotNull final Marker marker, String message, @NotNull final EventException e) {
-        validateAndFire(INFO, marker, format(message,e), Set.of(e));
-    }
-
-    public void infoSynchronized(@NotNull final Marker marker, String message, @NotNull final EventException e) {
-        validateAndFireSynchronized(INFO, marker, format(message,e), Set.of(e));
-    }
-
-    public void infoAsync(@NotNull final Marker marker, String message, @NotNull final EventException e) {
-        validateAndFireAsync(INFO, marker, format(message,e), Set.of(e));
+    public synchronized void infoSynchronized(@NotNull final String message) {
+        info(message);
     }
 
     /**
-     * Check if log calls to Log Level {@link Level#WARNING} will be logged or ignored.
-     *
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public void infoAsync(@NotNull final String message) {
+        executor.submit(() -> info(message));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    @Override
+    public void info(@NotNull final String message, final Object arg) {
+        process(INFO,message,arg);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public synchronized void infoSynchronized(@NotNull final String message, final Object arg) {
+        info(message,arg);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public void infoAsync(@NotNull final String message, final Object arg) {
+        executor.submit(() -> info(message,arg));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    @Override
+    public void info(@NotNull final String message, final Object arg1, final Object arg2) {
+        process(INFO,message,arg1,arg2);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public synchronized void infoSynchronized(@NotNull final String message, final Object arg1, final Object arg2) {
+        info(message,arg1,arg2);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public void infoAsync(@NotNull final String message, final Object arg1, final Object arg2) {
+        executor.submit(() -> info(message,arg1,arg2));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    @Override
+    public void info(@NotNull final String message, Object... args) {
+        process(INFO,message,args);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public synchronized void infoSynchronized(@NotNull final String message, Object... args) {
+        info(message,args);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public void infoAsync(@NotNull final String message, Object... args) {
+        executor.submit(() -> info(message,args));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    @Override
+    public void info(@NotNull final String message, @NotNull final Throwable t) {
+        process(INFO,message,t);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public synchronized void infoSynchronized(@NotNull final String message, @NotNull final Throwable t) {
+        info(message,t);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public void infoAsync(@NotNull final String message, @NotNull final Throwable t) {
+        executor.submit(() -> info(message,t));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param t Throwable to log.
+     * @apiNote Events are still triggered even if the message is not logged due to the current log level.
+     * @see     Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public void info(@NotNull final Throwable t) {
+        process(INFO,t);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param t Throwable to log.
+     * @apiNote Events are still triggered even if the message is not logged due to the current log level.
+     * @see     Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public synchronized void infoSynchronized(@NotNull final Throwable t) {
+        info(t);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param t Throwable to log.
+     * @apiNote Events are still triggered even if the message is not logged due to the current log level.
+     * @see     Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public void infoAsync(@NotNull final Throwable t) {
+        executor.submit(() -> info(t));
+    }
+
+    /**
+     * Checks if logs at {@link Level#INFO INFO} level, with the specified Marker, are logged or ignored.
+     * <p>
+     *     No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
+     *     The expected format of placeholders;
+     *      <pre>
+     *          {@code logger.info("Example {}.", Object);}
+     *      </pre>
+     * </p>
      * @return True | False
      */
-    @Contract(pure = true)
+    @Override @Contract(pure = true)
+    public boolean isInfoEnabled(@NotNull final Marker marker) {
+        return isLoggable(Level.INFO, marker);
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
     @Override
+    public void info(@Nullable final Marker marker, @NotNull final String message) {
+        process(INFO,marker,message);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public synchronized void infoSynchronized(@Nullable final Marker marker, @NotNull final String message) {
+        info(marker,message);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public void infoAsync(@Nullable final Marker marker, @NotNull final String message) {
+        executor.submit(() -> info(marker,message));
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    @Override
+    public void info(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
+        process(INFO,marker,message,arg);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public synchronized void infoSynchronized(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
+        info(marker,message,arg);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public void infoAsync(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
+        executor.submit(() -> info(marker,message,arg));
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    @Override
+    public void info(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
+        process(INFO,marker,message,arg1,arg2);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public synchronized void infoSynchronized(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
+        info(marker,message,arg1,arg2);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public void infoAsync(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
+        executor.submit(() -> info(marker,message,arg1,arg2));
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    @Override
+    public void info(@NotNull final Marker marker, @NotNull final String message, Object... args) {
+        process(INFO,marker,message,args);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public synchronized void infoSynchronized(@NotNull final Marker marker, @NotNull final String message, Object... args) {
+        info(marker,message,args);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public void infoAsync(@NotNull final Marker marker, @NotNull final String message, Object... args) {
+        executor.submit(() -> info(marker,message,args));
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    @Override
+    public void info(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
+        process(INFO,marker,t,message);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public synchronized void infoSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
+        info(marker,message,t);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public void infoAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
+        executor.submit(() -> info(marker,message,t));
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param t      Throwable to log.
+     * @param marker The Marker to attach.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     * @see          Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public void info(@NotNull final Marker marker, @NotNull final Throwable t) {
+        process(INFO,marker,t);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param t      Throwable to log.
+     * @param marker The Marker to attach.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     * @see          Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public synchronized void infoSynchronized(@NotNull final Marker marker, @NotNull final Throwable t) {
+        info(marker,t);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
+     * @param t      Throwable to log.
+     * @param marker The Marker to attach.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     * @see          Logger#isInfoEnabled()Logger#isInfoEnabled
+     */
+    public void infoAsync(@NotNull final Marker marker, @NotNull final Throwable t) {
+        executor.submit(() -> info(marker,t));
+    }
+
+    /**
+     * Checks if logs at {@link Level#WARNING WARNING} level are logged or ignored.
+     * <p>
+     *     No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
+     *     The expected format of placeholders;
+     *      <pre>
+     *          {@code logger.warn("Example {}.", Object);}
+     *      </pre>
+     * </p>
+     * @return True | False
+     */
+    @Override @Contract(pure = true)
     public boolean isWarnEnabled() {
         return isLoggable(Level.WARNING);
     }
 
-    @Contract(pure = true)
-    public boolean isWarningEnabled() {
-        return isWarnEnabled();
-    }
-
+    /**
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
     @Override
     public void warn(@NotNull final String message) {
-        validateAndFire(WARNING, message);
-    }
-
-    public void warnSynchronized(@NotNull final String message) {
-        validateAndFireSynchronized(WARNING, message);
-    }
-
-    public void warnAsync(@NotNull final String message) {
-        validateAndFireAsync(WARNING, message);
-    }
-
-    public void warning(@NotNull final String message) {
-        warn(message);
-    }
-
-    public void warningSynchronized(@NotNull final String message) {
-        warnSynchronized(message);
-    }
-
-    public void warningAsync(@NotNull final String message) {
-        warnAsync(message);
-    }
-
-    @Override
-    public void warn(@NotNull final String message, @NotNull final Object arg) {
-        validateAndFire(WARNING, format(message, arg), Set.of(arg));
-    }
-
-    public void warnSynchronized(@NotNull final String message, @NotNull final Object arg) {
-        validateAndFireSynchronized(WARNING, format(message, arg), Set.of(arg));
-    }
-
-    public void warnAsync(@NotNull final String message, @NotNull final Object arg) {
-        validateAndFireAsync(WARNING, format(message, arg), Set.of(arg));
-    }
-
-    public void warning(@NotNull final String message, @NotNull final Object arg) {
-        warn(message, arg);
-    }
-
-    public void warningSynchronized(@NotNull final String message, @NotNull final Object arg) {
-        warnSynchronized(message, arg);
-    }
-
-    public void warningAsync(@NotNull final String message, @NotNull final Object arg) {
-        warnAsync(message, arg);
-    }
-
-    @Override
-    public void warn(@NotNull final String message, @NotNull final Object... args) {
-        validateAndFire(WARNING, format(message, args), Set.of(args));
-    }
-
-    public void warnSynchronized(@NotNull final String message, @NotNull final Object... args) {
-        validateAndFireSynchronized(WARNING, format(message, args), Set.of(args));
-    }
-
-    public void warnAsync(@NotNull final String message, @NotNull final Object... args) {
-        validateAndFireAsync(WARNING, format(message, args), Set.of(args));
-    }
-
-    public void warning(@NotNull final String message, @NotNull final Object... arguments) {
-        warn(message, arguments);
-    }
-
-    public void warningSynchronized(@NotNull final String message, @NotNull final Object... arguments) {
-        warnSynchronized(message, arguments);
-    }
-
-    public void warningAsync(@NotNull final String message, @NotNull final Object... arguments) {
-        warnAsync(message, arguments);
-    }
-
-    @Override
-    public void warn(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        validateAndFire(WARNING, format(message, arg1,arg2), Set.of(arg1,arg2));
-    }
-
-    public void warnSynchronized(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        validateAndFireSynchronized(WARNING, format(message, arg1,arg2), Set.of(arg1,arg2));
-    }
-
-    public void warnAsync(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        validateAndFireAsync(WARNING, format(message, arg1,arg2), Set.of(arg1,arg2));
-    }
-
-    public void warning(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        warn(message, arg1, arg2);
-    }
-
-    public void warningSynchronized(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        warnSynchronized(message, arg1, arg2);
-    }
-
-    public void warningAsync(@NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        warnAsync(message, arg1, arg2);
-    }
-
-    @Override
-    public void warn(@NotNull final String message, @NotNull final Throwable t) {
-        validateAndFire(WARNING, format(message, t), Set.of(t));
-    }
-
-    public void warnSynchronized(@NotNull final String message, @NotNull final Throwable t) {
-        validateAndFireSynchronized(WARNING, format(message, t), Set.of(t));
-    }
-
-    public void warnAsync(@NotNull final String message, @NotNull final Throwable t) {
-        validateAndFireAsync(WARNING, format(message, t), Set.of(t));
-    }
-
-    public void warning(@NotNull final String message, @NotNull final Throwable t) {
-        warn(message, t);
-    }
-
-    public void warningSynchronized(@NotNull final String message, @NotNull final Throwable t) {
-        warnSynchronized(message, t);
-    }
-
-    public void warningAsync(@NotNull final String message, @NotNull final Throwable t) {
-        warnAsync(message, t);
-    }
-
-    public void warn(@NotNull final String message, @NotNull final EventException e) {
-        validateAndFire(WARNING, format(message, e), Set.of(e));
-    }
-
-    public void warnSynchronized(@NotNull final String message, @NotNull final EventException e) {
-        validateAndFireSynchronized(WARNING, format(message, e), Set.of(e));
-    }
-
-    public void warnAsync(@NotNull final String message, @NotNull final EventException e) {
-        validateAndFireAsync(WARNING, format(message, e), Set.of(e));
-    }
-
-    public void warning(@NotNull final String message, @NotNull final EventException e) {
-        warn(message, e);
-    }
-
-    public void warningSynchronized(@NotNull final String message, @NotNull final EventException e) {
-        warnSynchronized(message, e);
-    }
-
-    public void warningAsync(@NotNull final String message, @NotNull final EventException e) {
-        warnAsync(message, e);
+        process(WARNING,message);
     }
 
     /**
-     * Check if log calls to Log Level {@link Level#WARNING} with the given {@link Marker} will be logged or ignored.
-     * @return True, if the current Log Level is of Level Warning, or if the Marker is a registered forced marker.
-     * @see Logger#registerForcedMarker(Marker)
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
      */
-    @Contract(pure = true)
+    public synchronized void warnSynchronized(@NotNull final String message) {
+        warn(message);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public void warnAsync(@NotNull final String message) {
+        executor.submit(() -> warn(message));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
     @Override
+    public void warn(@NotNull final String message, final Object arg) {
+        process(WARNING,message,arg);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public synchronized void warnSynchronized(@NotNull final String message, final Object arg) {
+        warn(message,arg);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public void warnAsync(@NotNull final String message, final Object arg) {
+        executor.submit(() -> warn(message,arg));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    @Override
+    public void warn(@NotNull final String message, final Object arg1, final Object arg2) {
+        process(WARNING,message,arg1,arg2);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public synchronized void warnSynchronized(@NotNull final String message, final Object arg1, final Object arg2) {
+        warn(message,arg1,arg2);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public void warnAsync(@NotNull final String message, final Object arg1, final Object arg2) {
+        executor.submit(() -> warn(message,arg1,arg2));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    @Override
+    public void warn(@NotNull final String message, Object... args) {
+        process(WARNING,message,args);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public synchronized void warnSynchronized(@NotNull final String message, Object... args) {
+        warn(message,args);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public void warnAsync(@NotNull final String message, Object... args) {
+        executor.submit(() -> warn(message,args));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    @Override
+    public void warn(@NotNull final String message, @NotNull final Throwable t) {
+        process(WARNING,message,t);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public synchronized void warnSynchronized(@NotNull final String message, @NotNull final Throwable t) {
+        warn(message,t);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public void warnAsync(@NotNull final String message, @NotNull final Throwable t) {
+        executor.submit(() -> warn(message,t));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param t Throwable to log.
+     * @apiNote Events are still triggered even if the message is not logged due to the current log level.
+     * @see     Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public void warn(@NotNull final Throwable t) {
+        process(WARNING,t);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param t Throwable to log.
+     * @apiNote Events are still triggered even if the message is not logged due to the current log level.
+     * @see     Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public synchronized void warnSynchronized(@NotNull final Throwable t) {
+        warn(t);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param t Throwable to log.
+     * @apiNote Events are still triggered even if the message is not logged due to the current log level.
+     * @see     Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public void warnAsync(@NotNull final Throwable t) {
+        executor.submit(() -> warn(t));
+    }
+
+    /**
+     * Checks if logs at {@link Level#WARNING WARNING} level, with the specified Marker, are logged or ignored.
+     * <p>
+     *     No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
+     *     The expected format of placeholders;
+     *      <pre>
+     *          {@code logger.warn("Example {}.", Object);}
+     *      </pre>
+     * </p>
+     * @return True | False
+     */
+    @Override @Contract(pure = true)
     public boolean isWarnEnabled(@NotNull final Marker marker) {
         return isLoggable(Level.WARNING, marker);
     }
 
-    @Contract(pure = true)
-    public boolean isWarningEnabled(@NotNull final Marker marker) {
-        return isWarnEnabled(marker);
-    }
-
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
     @Override
-    public void warn(@NotNull final Marker marker, @NotNull final String message) {
-        validateAndFire(WARNING, marker, message);
+    public void warn(@Nullable final Marker marker, @NotNull final String message) {
+        process(WARNING,marker,message);
     }
 
-    public void warnSynchronized(@NotNull final Marker marker, @NotNull final String message) {
-        validateAndFireSynchronized(WARNING, marker, message);
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public synchronized void warnSynchronized(@Nullable final Marker marker, @NotNull final String message) {
+        warn(marker,message);
     }
 
-    public void warnAsync(@NotNull final Marker marker, @NotNull final String message) {
-        validateAndFireAsync(WARNING, marker, message);
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public void warnAsync(@Nullable final Marker marker, @NotNull final String message) {
+        executor.submit(() -> warn(marker,message));
     }
 
-    public void warning(@NotNull final Marker marker, @NotNull final String message) {
-        warn(marker, message);
-    }
-
-    public void warningSynchronized(@NotNull final Marker marker, @NotNull final String message) {
-        warnSynchronized(marker, message);
-    }
-
-    public void warningAsync(@NotNull final Marker marker, @NotNull final String message) {
-        warnAsync(marker, message);
-    }
-
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
     @Override
-    public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        validateAndFire(WARNING, marker, format(message, arg), Set.of(arg));
+    public void warn(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
+        process(WARNING,marker,message,arg);
     }
 
-    public void warnSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        validateAndFireSynchronized(WARNING, marker, format(message, arg), Set.of(arg));
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public synchronized void warnSynchronized(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
+        warn(marker,message,arg);
     }
 
-    public void warnAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        validateAndFireAsync(WARNING, marker, format(message, arg), Set.of(arg));
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public void warnAsync(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
+        executor.submit(() -> warn(marker,message,arg));
     }
 
-    public void warning(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        warn(marker, message, arg);
-    }
-
-    public void warningSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        warnSynchronized(marker, message, arg);
-    }
-
-    public void warningAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        warnAsync(marker, message, arg);
-    }
-
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
     @Override
-    public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        validateAndFire(WARNING, marker, format(message, arg1,arg2), Set.of(arg1,arg2));
+    public void warn(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
+        process(WARNING,marker,message,arg1,arg2);
     }
 
-    public void warnSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        validateAndFireSynchronized(WARNING, marker, format(message, arg1,arg2), Set.of(arg1,arg2));
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public synchronized void warnSynchronized(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
+        warn(marker,message,arg1,arg2);
     }
 
-    public void warnAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        validateAndFireAsync(WARNING, marker, format(message, arg1,arg2), Set.of(arg1,arg2));
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public void warnAsync(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
+        executor.submit(() -> warn(marker,message,arg1,arg2));
     }
 
-    public void warning(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        warn(marker, message, arg1, arg2);
-    }
-
-    public void warningSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        warnSynchronized(marker, message, arg1, arg2);
-    }
-
-    public void warningAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        warnAsync(marker, message, arg1, arg2);
-    }
-
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
     @Override
-    public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... args) {
-        validateAndFire(WARNING, marker, format(message, args), Set.of(args));
+    public void warn(@NotNull final Marker marker, @NotNull final String message, Object... args) {
+        process(WARNING,marker,message,args);
     }
 
-    public void warnSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... args) {
-        validateAndFireSynchronized(WARNING, marker, format(message, args), Set.of(args));
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public synchronized void warnSynchronized(@NotNull final Marker marker, @NotNull final String message, Object... args) {
+        warn(marker,message,args);
     }
 
-    public void warnAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... args) {
-        validateAndFireAsync(WARNING, marker, format(message, args), Set.of(args));
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public void warnAsync(@NotNull final Marker marker, @NotNull final String message, Object... args) {
+        executor.submit(() -> warn(marker,message,args));
     }
 
-    public void warning(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... arguments) {
-        warn(marker, message, arguments);
-    }
-
-    public void warningSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... arguments) {
-        warnSynchronized(marker, message, arguments);
-    }
-
-    public void warningAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object... arguments) {
-        warnAsync(marker, message, arguments);
-    }
-
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
     @Override
     public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        validateAndFire(WARNING, marker, format(message, t), Set.of(t));
-    }
-
-    public void warnSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        validateAndFireSynchronized(WARNING, marker, format(message, t), Set.of(t));
-    }
-
-    public void warnAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        validateAndFireAsync(WARNING, marker, format(message, t), Set.of(t));
-    }
-
-    public void warning(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        warn(marker, message, t);
-    }
-
-    public void warningSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        warnSynchronized(marker, message, t);
-    }
-
-    public void warningAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
-        warnAsync(marker, message, t);
-    }
-
-    public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
-        validateAndFire(WARNING, marker, format(message, e), Set.of(e));
-    }
-
-    public void warnSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
-        validateAndFireSynchronized(WARNING, marker, format(message, e), Set.of(e));
-    }
-
-    public void warnAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
-        validateAndFireAsync(WARNING, marker, format(message, e), Set.of(e));
-    }
-
-    public void warning(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
-        warn(marker, message, e);
-    }
-
-    public void warningSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
-        warnSynchronized(marker, message, e);
-    }
-
-    public void warningAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final EventException e) {
-        warnAsync(marker, message, e);
+        process(WARNING,marker,t,message);
     }
 
     /**
-     * Check if log calls to Log Level {@link Level#ERROR} will be logged or ignored.
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public synchronized void warnSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
+        warn(marker,message,t);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public void warnAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
+        executor.submit(() -> warn(marker,message,t));
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param t      Throwable to log.
+     * @param marker The Marker to attach.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     * @see          Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public void warn(@NotNull final Marker marker, @NotNull final Throwable t) {
+        process(WARNING,marker,t);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param t      Throwable to log.
+     * @param marker The Marker to attach.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     * @see          Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public synchronized void warnSynchronized(@NotNull final Marker marker, @NotNull final Throwable t) {
+        warn(marker,t);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param t      Throwable to log.
+     * @param marker The Marker to attach.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     * @see          Logger#isWarnEnabled()Logger#isWarnEnabled
+     */
+    public void warnAsync(@NotNull final Marker marker, @NotNull final Throwable t) {
+        executor.submit(() -> warn(marker,t));
+    }
+
+    /**
+     * Checks if logs at {@link Level#ERROR ERROR} level are logged or ignored.
+     * <p>
+     *     No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
+     *     The expected format of placeholders;
+     *      <pre>
+     *          {@code logger.error("Example {}.", Object);}
+     *      </pre>
+     * </p>
      * @return True | False
      */
-    @Contract(pure = true)
-    @Override
+    @Override @Contract(pure = true)
     public boolean isErrorEnabled() {
-        return isLoggable(ERROR);
-    }
-
-    @Override
-    public void error(@NotNull final String message) {
-        validateAndFire(ERROR, message);
-    }
-
-    public void errorSynchronized(@NotNull final String message) {
-        validateAndFireSynchronized(ERROR, message);
-    }
-
-    public void errorAsync(@NotNull final String message) {
-        validateAndFireAsync(ERROR, message);
-    }
-
-    @Override
-    public void error(@NotNull String message, @NotNull final Object arg) {
-        validateAndFire(ERROR, format(message, arg), Set.of(arg));
-    }
-
-    public void errorSynchronized(@NotNull String message, @NotNull final Object arg) {
-        validateAndFireSynchronized(ERROR, format(message, arg), Set.of(arg));
-    }
-
-    public void errorAsync(@NotNull String message, @NotNull final Object arg) {
-        validateAndFireAsync(ERROR, format(message, arg), Set.of(arg));
-    }
-
-    @Override
-    public void error(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
-        validateAndFire(ERROR, format(message, arg1, arg2), Set.of(arg1, arg2));
-    }
-
-    public void errorSynchronized(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
-        validateAndFireSynchronized(ERROR, format(message, arg1, arg2), Set.of(arg1, arg2));
-    }
-
-    public void errorAsync(@NotNull String message, @NotNull final Object arg1, final Object arg2) {
-        validateAndFireAsync(ERROR, format(message, arg1, arg2), Set.of(arg1, arg2));
-    }
-
-    @Override
-    public void error(@NotNull String message, @NotNull final Object... args) {
-        validateAndFire(ERROR, format(message, args), Set.of(args));
-    }
-
-    public void errorSynchronized(@NotNull String message, @NotNull final Object... args) {
-        validateAndFireSynchronized(ERROR, format(message, args), Set.of(args));
-    }
-
-    public void errorAsync(@NotNull String message, @NotNull final Object... args) {
-        validateAndFireAsync(ERROR, format(message, args), Set.of(args));
-    }
-
-    @Override
-    public void error(@NotNull String message, @NotNull final Throwable t) {
-        validateAndFire(ERROR, format(message, t), Set.of(t));
-    }
-
-    public void errorSynchronized(@NotNull String message, @NotNull final Throwable t) {
-        validateAndFireSynchronized(ERROR, format(message, t), Set.of(t));
-    }
-
-    public void errorAsync(@NotNull String message, @NotNull final Throwable t) {
-        validateAndFireAsync(ERROR, format(message, t), Set.of(t));
-    }
-
-    public void error(@NotNull String message, @NotNull final EventException e) {
-        validateAndFire(ERROR, format(message, e), Set.of(e));
-    }
-
-    public void errorSynchronized(@NotNull String message, @NotNull final EventException e) {
-        validateAndFireSynchronized(ERROR, format(message, e), Set.of(e));
-    }
-
-    public void errorAsync(@NotNull String message, @NotNull final EventException e) {
-        validateAndFireAsync(ERROR, format(message, e), Set.of(e));
+        return isLoggable(Level.ERROR);
     }
 
     /**
-     * Check if log calls to Log Level {@link Level#ERROR} with the given {@link Marker} will be logged or ignored.
-     * @return True, if the current Log Level is of Level Error, or if the Marker is a registered forced marker.
-     * @see Logger#registerForcedMarker(Marker)
+     * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
      */
-    @Contract(pure = true)
     @Override
+    public void error(@NotNull final String message) {
+        process(ERROR,message);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public synchronized void errorSynchronized(@NotNull final String message) {
+        error(message);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public void errorAsync(@NotNull final String message) {
+        executor.submit(() -> error(message));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    @Override
+    public void error(@NotNull final String message, final Object arg) {
+        process(ERROR,message,arg);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public synchronized void errorSynchronized(@NotNull final String message, final Object arg) {
+        error(message,arg);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public void errorAsync(@NotNull final String message, final Object arg) {
+        executor.submit(() -> error(message,arg));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    @Override
+    public void error(@NotNull final String message, final Object arg1, final Object arg2) {
+        process(ERROR,message,arg1,arg2);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public synchronized void errorSynchronized(@NotNull final String message, final Object arg1, final Object arg2) {
+        error(message,arg1,arg2);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public void errorAsync(@NotNull final String message, final Object arg1, final Object arg2) {
+        executor.submit(() -> error(message,arg1,arg2));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    @Override
+    public void error(@NotNull final String message, Object... args) {
+        process(ERROR,message,args);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public synchronized void errorSynchronized(@NotNull final String message, Object... args) {
+        error(message,args);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public void errorAsync(@NotNull final String message, Object... args) {
+        executor.submit(() -> error(message,args));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    @Override
+    public void error(@NotNull final String message, @NotNull final Throwable t) {
+        process(ERROR,message,t);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public synchronized void errorSynchronized(@NotNull final String message, @NotNull final Throwable t) {
+        error(message,t);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public void errorAsync(@NotNull final String message, @NotNull final Throwable t) {
+        executor.submit(() -> error(message,t));
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param t Throwable to log.
+     * @apiNote Events are still triggered even if the message is not logged due to the current log level.
+     * @see     Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public void error(@NotNull final Throwable t) {
+        process(ERROR,t);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param t Throwable to log.
+     * @apiNote Events are still triggered even if the message is not logged due to the current log level.
+     * @see     Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public synchronized void errorSynchronized(@NotNull final Throwable t) {
+        error(t);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param t Throwable to log.
+     * @apiNote Events are still triggered even if the message is not logged due to the current log level.
+     * @see     Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public void errorAsync(@NotNull final Throwable t) {
+        executor.submit(() -> error(t));
+    }
+
+    /**
+     * Checks if logs at {@link Level#ERROR ERROR} level, with the specified Marker, are logged or ignored.
+     * <p>
+     *     No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
+     *     The expected format of placeholders;
+     *      <pre>
+     *          {@code logger.error("Example {}.", Object);}
+     *      </pre>
+     * </p>
+     * @return True | False
+     */
+    @Override @Contract(pure = true)
     public boolean isErrorEnabled(@NotNull final Marker marker) {
-        return isLoggable(ERROR, marker);
+        return isLoggable(Level.ERROR, marker);
     }
 
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
     @Override
-    public void error(@NotNull final Marker marker, @NotNull final String message) {
-        validateAndFire(ERROR, marker, message);
+    public void error(@Nullable final Marker marker, @NotNull final String message) {
+        process(ERROR,marker,message);
     }
 
-    public void errorSynchronized(@NotNull final Marker marker, @NotNull final String message) {
-        validateAndFireSynchronized(ERROR, marker, message);
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public synchronized void errorSynchronized(@Nullable final Marker marker, @NotNull final String message) {
+        error(marker,message);
     }
 
-    public void errorAsync(@NotNull final Marker marker, @NotNull final String message) {
-        validateAndFireAsync(ERROR, marker, message);
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public void errorAsync(@Nullable final Marker marker, @NotNull final String message) {
+        executor.submit(() -> error(marker,message));
     }
 
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
     @Override
-    public void error(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        validateAndFire(ERROR, marker, format(message,arg), Set.of(arg));
+    public void error(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
+        process(ERROR,marker,message,arg);
     }
 
-    public void errorSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        validateAndFireSynchronized(ERROR, marker, format(message,arg), Set.of(arg));
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public synchronized void errorSynchronized(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
+        error(marker,message,arg);
     }
 
-    public void errorAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Object arg) {
-        validateAndFireAsync(ERROR, marker, format(message,arg), Set.of(arg));
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public void errorAsync(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
+        executor.submit(() -> error(marker,message,arg));
     }
 
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
     @Override
-    public void error(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        validateAndFire(ERROR, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
+    public void error(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
+        process(ERROR,marker,message,arg1,arg2);
     }
 
-    public void errorSynchronized(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        validateAndFireSynchronized(ERROR, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public synchronized void errorSynchronized(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
+        error(marker,message,arg1,arg2);
     }
 
-    public void errorAsync(@NotNull final Marker marker, String message, @NotNull final Object arg1, @NotNull final Object arg2) {
-        validateAndFireAsync(ERROR, marker, format(message,arg1,arg2), Set.of(arg1,arg2));
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public void errorAsync(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
+        executor.submit(() -> error(marker,message,arg1,arg2));
     }
 
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
     @Override
-    public void error(@NotNull final Marker marker, String message, Object... args) {
-        validateAndFire(ERROR, marker, format(message,args), Set.of(args));
+    public void error(@NotNull final Marker marker, @NotNull final String message, Object... args) {
+        process(ERROR,marker,message,args);
     }
 
-    public void errorSynchronized(@NotNull final Marker marker, String message, Object... args) {
-        validateAndFireSynchronized(ERROR, marker, format(message,args), Set.of(args));
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public synchronized void errorSynchronized(@NotNull final Marker marker, @NotNull final String message, Object... args) {
+        error(marker,message,args);
     }
 
-    public void errorAsync(@NotNull final Marker marker, String message, Object... args) {
-        validateAndFireAsync(ERROR, marker, format(message,args), Set.of(args));
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public void errorAsync(@NotNull final Marker marker, @NotNull final String message, Object... args) {
+        executor.submit(() -> error(marker,message,args));
     }
 
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
     @Override
-    public void error(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
-        validateAndFire(ERROR, marker, format(message,t), Set.of(t));
+    public void error(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
+        process(ERROR,marker,t,message);
     }
 
-    public void errorSynchronized(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
-        validateAndFireSynchronized(ERROR, marker, format(message,t), Set.of(t));
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public synchronized void errorSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
+        error(marker,message,t);
     }
 
-    public void errorAsync(@NotNull final Marker marker, String message, @NotNull final Throwable t) {
-        validateAndFireAsync(ERROR, marker, format(message,t), Set.of(t));
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public void errorAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
+        executor.submit(() -> error(marker,message,t));
     }
 
-    public void error(@NotNull final Marker marker, String message, @NotNull final EventException e) {
-        validateAndFire(ERROR, marker, format(message,e), Set.of(e));
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param t      Throwable to log.
+     * @param marker The Marker to attach.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     * @see          Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public void error(@NotNull final Marker marker, @NotNull final Throwable t) {
+        process(ERROR,marker,t);
     }
 
-    public void errorSynchronized(@NotNull final Marker marker, String message, @NotNull final EventException e) {
-        validateAndFireSynchronized(ERROR, marker, format(message,e), Set.of(e));
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param t      Throwable to log.
+     * @param marker The Marker to attach.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     * @see          Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public synchronized void errorSynchronized(@NotNull final Marker marker, @NotNull final Throwable t) {
+        error(marker,t);
     }
 
-    public void errorAsync(@NotNull final Marker marker, String message, @NotNull final EventException e) {
-        validateAndFireAsync(ERROR, marker, format(message,e), Set.of(e));
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
+     * @param t      Throwable to log.
+     * @param marker The Marker to attach.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     * @see          Logger#isErrorEnabled()Logger#isErrorEnabled
+     */
+    public void errorAsync(@NotNull final Marker marker, @NotNull final Throwable t) {
+        executor.submit(() -> error(marker,t));
     }
 
-    @Contract(pure = true)
-    private static @NotNull String format(@NotNull final String log, @NotNull final Object... args) {
-        String message = log.replaceAll("%[s|d]", Matcher.quoteReplacement("{}"))
-                .replace("%d", Matcher.quoteReplacement("{}"))
-                .replaceAll("(%(\\.\\d)?f)", Matcher.quoteReplacement("{}"));
-        for (Object arg : args) {
-            if (arg instanceof EventException e) arg = e.getCause();
-            switch (arg) {
-                case ErrorResponseException error -> {
-                    message = message.replaceFirst("(?<!\\n)(\\{})", Matcher.quoteReplacement("\n{}"));
-                    final StringBuilder builder = new StringBuilder();
-                    builder.append("\n").append(EXCEPTION.getColor()).append("[")
-                            .append(error.getErrorCode()).append("]:")
-                            .append(error.getErrorResponse()).append(" - ")
-                            .append(error.getMeaning()).append("\n");
-                    for (final StackTraceElement st : error.getStackTrace()) {
-                        builder.append(Level.EXCEPTION.getColor()).append(st.toString()).append("\n");
-                    }
-                    message = message.replaceFirst("\\{}", Matcher.quoteReplacement(builder.toString()));
-                }
-                case Throwable t -> {
-                    final StringBuilder builder = new StringBuilder();
-                    builder.append(Level.EXCEPTION.getColor()).append(t.getMessage()).append("\n");
-                    for (final StackTraceElement st : t.getStackTrace()) {
-                        builder.append(Level.EXCEPTION.getColor()).append(st.toString()).append("\n");
-                    }
-                    message = message.replaceFirst("\\{}", Matcher.quoteReplacement(builder.toString()));
-                }
-                case Collection<?> c -> {
-                    final StringBuilder builder = new StringBuilder();
-                    builder.append("[ ");
-                    final Iterator<?> iterator = c.iterator();
-                    while (iterator.hasNext()) {
-                        builder.append(iterator.next());
-                        if (iterator.hasNext()) builder.append(", ");
-                    }
-                    builder.append("]");
-                    message = message.replaceFirst("\\{}", Matcher.quoteReplacement(builder.toString()));
-                }
-                case Map<?, ?> m -> {
-                    final StringBuilder builder = new StringBuilder();
-                    builder.append("{");
-                    for (final var index : m.entrySet()) {
-                        builder.append(" [ %s , %s ] ".formatted(String.valueOf(index.getKey()), String.valueOf(index.getValue())));
-                    }
-                    builder.append("}");
-                    message = message.replaceFirst("\\{}", Matcher.quoteReplacement(builder.toString()));
-                }
-                /*case Number n -> {
-                    if (!message.contains("\\{}"))
-                    if (Pattern.matches("(\\{-([a-zA-Z]){1,3}})",message)) {
-                        String replacement = Pattern.compile("(\\{-([a-zA-Z]){1,3}})").matcher(message).toMatchResult().toString();
-                        message = message.replaceFirst("(\\{-([a-zA-Z]){1,3}})", Matcher.quoteReplacement(replacement));
-                    }
-                }*/
-                case String s -> message = message.replaceFirst("\\{}", Matcher.quoteReplacement(s));
-                default -> message = message.replaceFirst("\\{}", Matcher.quoteReplacement(arg.toString()));
-            }
-        }
-        return message;
+    /**
+     * Auto-formats the exception and logs it at {@link Level#EXCEPTION EXCEPTION} level.
+     * @param t      Exception to log.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     *               All logs containing exceptions will automatically be converted to an exception log.
+     */
+    public void exception(@NotNull final Throwable t) {
+        process(EXCEPTION,t);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Auto-formats the exception and logs it at {@link Level#EXCEPTION EXCEPTION} level.
+     * @param t      Exception to log.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     *               All logs containing exceptions will automatically be converted to an exception log.
+     */
+    public void exceptionSynchronized(@NotNull final Throwable t) {
+        exception(t);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Auto-formats the exception and logs it at {@link Level#EXCEPTION EXCEPTION} level.
+     * @param t      Exception to log.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     *               All logs containing exceptions will automatically be converted to an exception log.
+     */
+    public void exceptionAsync(@NotNull final Throwable t) {
+        executor.submit(() -> exception(t));
+    }
+
+    /**
+     * Auto-formats the exception and logs it, with the specified Marker, at {@link Level#EXCEPTION EXCEPTION} level.
+     * @param t      Exception to log.
+     * @param marker The Marker to attach.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     *               All logs containing exceptions will automatically be converted to an exception log.
+     */
+    public void exception(@NotNull final Marker marker, @NotNull final Throwable t) {
+        process(EXCEPTION,marker,t);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Auto-formats the exception and logs it, with the specified Marker, at {@link Level#EXCEPTION EXCEPTION} level.
+     * @param t      Exception to log.
+     * @param marker The Marker to attach.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     *               All logs containing exceptions will automatically be converted to an exception log.
+     */
+    public void exceptionSynchronized(@NotNull final Marker marker, @NotNull final Throwable t) {
+        exception(marker,t);
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Auto-formats the exception and logs it, with the specified Marker, at {@link Level#EXCEPTION EXCEPTION} level.
+     * @param t      Exception to log.
+     * @param marker The Marker to attach.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     *               All logs containing exceptions will automatically be converted to an exception log.
+     */
+    public void exceptionAsync(@NotNull final Marker marker, @NotNull final Throwable t) {
+        executor.submit(() -> exception(marker,t));
     }
 }
