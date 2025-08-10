@@ -9,7 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The Marker Factory is responsible for handling existing Markers and creating new Markers.
- * @apiNote Factory operations are Thread safe.
+ * <hr><b>Factory operations are Thread safe.</b>
  */
 public final class MarkerFactory implements IMarkerFactory {
 

@@ -8,7 +8,7 @@ import java.util.Deque;
 import java.util.Map;
 
 /**
- * @apiNote <b><i>This feature is not supported!</i></b>
+ * <b><i>This feature is not supported!</i></b>
  */
 public class MDCAdapter implements org.slf4j.spi.MDCAdapter {
 

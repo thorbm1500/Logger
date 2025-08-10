@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
- * @apiNote <b>For internal use only.</b>
+ * <b>For internal use only.</b>
  */
 public final class EventManager {
 

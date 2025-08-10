@@ -11,7 +11,7 @@ import org.slf4j.spi.SLF4JServiceProvider;
  * @author Thor B.<br>
  * See more <i><a href="https://github.com/thorbm1500">github@thorbm1500</a></i><br>
  * See more <i><a href="https://repo.prodzeus.dev">repo@prodzeus</a></i>
- * @version 1.0.0
+ * @version 1.0.1
  */
 public final class SLF4JProvider implements SLF4JServiceProvider {
 
@@ -50,8 +50,7 @@ public final class SLF4JProvider implements SLF4JServiceProvider {
     }
 
     /**
-     * Gets the SLF4J Provider.<br>
-     * <b>Note: If an instance is not present, one will be created for you.</b>
+     * Gets the SLF4J Provider. If an instance is not present, one will be created for you.
      * @return The SLF4J Provider.
      */
     @Contract(pure = true)

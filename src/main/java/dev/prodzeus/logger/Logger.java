@@ -15,6 +15,9 @@ import java.util.concurrent.Executors;
 
 import static dev.prodzeus.logger.components.Level.*;
 
+/**
+ * Logger class.
+ */
 public final class Logger implements org.slf4j.Logger {
 
     private static final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -69,7 +72,7 @@ public final class Logger implements org.slf4j.Logger {
      * This setting dictates whether the Global level should be respected or ignored.
      * <b>Default:</b> {@code False}
      * @param ignore True | False
-     * @see SLF4JProvider#setGlobalLevel(Level)SLF4JProvider#setGlobalLevel
+     * @see SLF4JProvider#setGlobalLevel(Level) SLF4JProvider#setGlobalLevel
      */
     public void ignoreGlobalLogLevel(final boolean ignore) {
         this.ignoreGlobalLevel = ignore;
@@ -79,7 +82,7 @@ public final class Logger implements org.slf4j.Logger {
      * Sets the current log level for this instance. Any log call below this level will be ignored.
      * @param level New log level.
      * @return The Logger instance.
-     * @see SLF4JProvider#setGlobalLevel(Level)SLF4JProvider#setGlobalLevel
+     * @see SLF4JProvider#setGlobalLevel(Level) SLF4JProvider#setGlobalLevel
      */
     public @NotNull Logger setLevel(@NotNull final Level level) {
         this.level = level;
@@ -90,7 +93,7 @@ public final class Logger implements org.slf4j.Logger {
      * Gets the current log level set.
      * Any logs logged below this level will be ignored unless a registered Forced Marker is attached to the log.
      * @return The Logger's current level.
-     * @see Logger#registerForcedMarker(Marker)Logger#registerForcedMarker
+     * @see Logger#registerForcedMarker(Marker) Logger#registerForcedMarker
      */
     @Contract(pure = true)
     public @NotNull Level getLevel() {
@@ -122,7 +125,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param level  The level.
      * @return       True, if logs at this level are logged,
      *               or if the marker is a registered Forced Marker, otherwise false.
-     * @see          Logger#registerForcedMarker(Marker)Logger#registerForcedMarker
+     * @see          Logger#registerForcedMarker(Marker) Logger#registerForcedMarker
      */
     @Contract(pure = true)
     public boolean isLoggable(@NotNull final Level level, @Nullable final Marker marker) {
@@ -148,7 +151,7 @@ public final class Logger implements org.slf4j.Logger {
      * @apiNote <b>For internal use only.</b>
      */
     private void process(@NotNull Level level, @NotNull String message, @NotNull final Object... args) {
-        process(level, null, null, message, Set.of(args));
+        process(level, null, null, message, List.of(args));
     }
 
     /**
@@ -176,7 +179,7 @@ public final class Logger implements org.slf4j.Logger {
      * @apiNote <b>For internal use only.</b>
      */
     private void process(@NotNull Level level, @Nullable final Marker marker, @Nullable final Throwable throwable, @NotNull String message, @NotNull final Object... args) {
-        process(level, marker, throwable, message, Set.of(args));
+        process(level, marker, throwable, message, List.of(args));
     }
 
     /**
@@ -190,7 +193,7 @@ public final class Logger implements org.slf4j.Logger {
      * @apiNote <b>For internal use only.</b>
      */
     private void process(final boolean fireEvent, @NotNull Level level, @Nullable final Marker marker, @Nullable final Throwable throwable, @NotNull String message, @NotNull final Collection<Object> args) {
-        final Collection<Object> arguments = new HashSet<>(args);
+        final List<Object> arguments = new ArrayList<>(args);
         if (throwable != null) arguments.add(throwable);
         final Pair<String, Level> formatted = Formatter.formatPlaceholders(message,arguments);
         if (formatted.getRight() == EXCEPTION) {
@@ -204,14 +207,12 @@ public final class Logger implements org.slf4j.Logger {
     }
 
     /**
-     * Checks if logs at {@link Level#TRACE TRACE} level are logged or ignored.
-     * <p>
-     *     No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
-     *     The expected format of placeholders;
+     * Checks if logs at {@link Level#TRACE TRACE} level are logged or ignored.<br>
+     * No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
+     * The expected format of placeholders;
      *      <pre>
      *          {@code logger.trace("Example {}.", Object);}
      *      </pre>
-     * </p>
      * @return True | False
      */
     @Override @Contract(pure = true)
@@ -223,7 +224,7 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
      * @param message The String log.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     @Override
     public void trace(@NotNull final String message) {
@@ -235,7 +236,7 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
      * @param message The String log.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public synchronized void traceSynchronized(@NotNull final String message) {
         trace(message);
@@ -246,7 +247,7 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
      * @param message The String log.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public void traceAsync(@NotNull final String message) {
         executor.submit(() -> trace(message));
@@ -257,7 +258,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String to log.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     @Override
     public void trace(@NotNull final String message, final Object arg) {
@@ -270,7 +271,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public synchronized void traceSynchronized(@NotNull final String message, final Object arg) {
         trace(message,arg);
@@ -282,7 +283,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public void traceAsync(@NotNull final String message, final Object arg) {
         executor.submit(() -> trace(message,arg));
@@ -294,7 +295,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     @Override
     public void trace(@NotNull final String message, final Object arg1, final Object arg2) {
@@ -308,7 +309,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public synchronized void traceSynchronized(@NotNull final String message, final Object arg1, final Object arg2) {
         trace(message,arg1,arg2);
@@ -321,7 +322,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public void traceAsync(@NotNull final String message, final Object arg1, final Object arg2) {
         executor.submit(() -> trace(message,arg1,arg2));
@@ -332,7 +333,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String to log.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     @Override
     public void trace(@NotNull final String message, Object... args) {
@@ -345,7 +346,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public synchronized void traceSynchronized(@NotNull final String message, Object... args) {
         trace(message,args);
@@ -357,7 +358,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public void traceAsync(@NotNull final String message, Object... args) {
         executor.submit(() -> trace(message,args));
@@ -368,7 +369,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String to log.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     @Override
     public void trace(@NotNull final String message, @NotNull final Throwable t) {
@@ -381,7 +382,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public synchronized void traceSynchronized(@NotNull final String message, @NotNull final Throwable t) {
         trace(message,t);
@@ -393,7 +394,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public void traceAsync(@NotNull final String message, @NotNull final Throwable t) {
         executor.submit(() -> trace(message,t));
@@ -403,7 +404,7 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
      * @param t Throwable to log.
      * @apiNote Events are still triggered even if the message is not logged due to the current log level.
-     * @see     Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see     Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public void trace(@NotNull final Throwable t) {
         process(TRACE,t);
@@ -414,7 +415,7 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
      * @param t Throwable to log.
      * @apiNote Events are still triggered even if the message is not logged due to the current log level.
-     * @see     Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see     Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public synchronized void traceSynchronized(@NotNull final Throwable t) {
         trace(t);
@@ -425,21 +426,19 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#TRACE TRACE} level consisting of the specified message, along with all the specified arguments.
      * @param t Throwable to log.
      * @apiNote Events are still triggered even if the message is not logged due to the current log level.
-     * @see     Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see     Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public void traceAsync(@NotNull final Throwable t) {
         executor.submit(() -> trace(t));
     }
 
     /**
-     * Checks if logs at {@link Level#TRACE TRACE} level, with the specified Marker, are logged or ignored.
-     * <p>
-     *     No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
-     *     The expected format of placeholders;
+     * Checks if logs at {@link Level#TRACE TRACE} level, with the specified Marker, are logged or ignored.<br>
+     * No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
+     * The expected format of placeholders;
      *      <pre>
      *          {@code logger.trace("Example {}.", Object);}
      *      </pre>
-     * </p>
      * @return True | False
      */
     @Override @Contract(pure = true)
@@ -452,7 +451,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param marker  The Marker to attach.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     @Override
     public void trace(@Nullable final Marker marker, @NotNull final String message) {
@@ -465,7 +464,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param marker  The Marker to attach.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public synchronized void traceSynchronized(@Nullable final Marker marker, @NotNull final String message) {
         trace(marker,message);
@@ -477,7 +476,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param marker  The Marker to attach.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public void traceAsync(@Nullable final Marker marker, @NotNull final String message) {
         executor.submit(() -> trace(marker,message));
@@ -489,7 +488,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     @Override
     public void trace(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
@@ -503,7 +502,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public synchronized void traceSynchronized(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
         trace(marker,message,arg);
@@ -516,7 +515,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public void traceAsync(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
         executor.submit(() -> trace(marker,message,arg));
@@ -529,7 +528,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     @Override
     public void trace(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
@@ -544,7 +543,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public synchronized void traceSynchronized(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
         trace(marker,message,arg1,arg2);
@@ -558,7 +557,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public void traceAsync(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
         executor.submit(() -> trace(marker,message,arg1,arg2));
@@ -570,7 +569,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     @Override
     public void trace(@NotNull final Marker marker, @NotNull final String message, Object... args) {
@@ -584,7 +583,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public synchronized void traceSynchronized(@NotNull final Marker marker, @NotNull final String message, Object... args) {
         trace(marker,message,args);
@@ -597,7 +596,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public void traceAsync(@NotNull final Marker marker, @NotNull final String message, Object... args) {
         executor.submit(() -> trace(marker,message,args));
@@ -609,7 +608,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     @Override
     public void trace(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
@@ -623,7 +622,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public synchronized void traceSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
         trace(marker,message,t);
@@ -636,7 +635,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see           Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public void traceAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
         executor.submit(() -> trace(marker,message,t));
@@ -647,7 +646,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param t      Throwable to log.
      * @param marker The Marker to attach.
      * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
-     * @see          Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see          Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public void trace(@NotNull final Marker marker, @NotNull final Throwable t) {
         process(TRACE,marker,t);
@@ -659,7 +658,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param t      Throwable to log.
      * @param marker The Marker to attach.
      * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
-     * @see          Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see          Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public synchronized void traceSynchronized(@NotNull final Marker marker, @NotNull final Throwable t) {
         trace(marker,t);
@@ -671,21 +670,19 @@ public final class Logger implements org.slf4j.Logger {
      * @param t      Throwable to log.
      * @param marker The Marker to attach.
      * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
-     * @see          Logger#isTraceEnabled()Logger#isTraceEnabled
+     * @see          Logger#isTraceEnabled() Logger#isTraceEnabled
      */
     public void traceAsync(@NotNull final Marker marker, @NotNull final Throwable t) {
         executor.submit(() -> trace(marker,t));
     }
 
     /**
-     * Checks if logs at {@link Level#DEBUG DEBUG} level are logged or ignored.
-     * <p>
-     *     No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
-     *     The expected format of placeholders;
+     * Checks if logs at {@link Level#DEBUG DEBUG} level are logged or ignored.<br>
+     * No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
+     * The expected format of placeholders;
      *      <pre>
      *          {@code logger.debug("Example {}.", Object);}
      *      </pre>
-     * </p>
      * @return True | False
      */
     @Override @Contract(pure = true)
@@ -697,7 +694,7 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
      * @param message The String log.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     @Override
     public void debug(@NotNull final String message) {
@@ -709,7 +706,7 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
      * @param message The String log.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public synchronized void debugSynchronized(@NotNull final String message) {
         debug(message);
@@ -720,7 +717,7 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
      * @param message The String log.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public void debugAsync(@NotNull final String message) {
         executor.submit(() -> debug(message));
@@ -731,7 +728,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String to log.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     @Override
     public void debug(@NotNull final String message, final Object arg) {
@@ -744,7 +741,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public synchronized void debugSynchronized(@NotNull final String message, final Object arg) {
         debug(message,arg);
@@ -756,7 +753,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public void debugAsync(@NotNull final String message, final Object arg) {
         executor.submit(() -> debug(message,arg));
@@ -768,7 +765,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     @Override
     public void debug(@NotNull final String message, final Object arg1, final Object arg2) {
@@ -782,7 +779,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public synchronized void debugSynchronized(@NotNull final String message, final Object arg1, final Object arg2) {
         debug(message,arg1,arg2);
@@ -795,7 +792,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public void debugAsync(@NotNull final String message, final Object arg1, final Object arg2) {
         executor.submit(() -> debug(message,arg1,arg2));
@@ -806,7 +803,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String to log.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     @Override
     public void debug(@NotNull final String message, Object... args) {
@@ -819,7 +816,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public synchronized void debugSynchronized(@NotNull final String message, Object... args) {
         debug(message,args);
@@ -831,7 +828,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public void debugAsync(@NotNull final String message, Object... args) {
         executor.submit(() -> debug(message,args));
@@ -842,7 +839,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String to log.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     @Override
     public void debug(@NotNull final String message, @NotNull final Throwable t) {
@@ -855,7 +852,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public synchronized void debugSynchronized(@NotNull final String message, @NotNull final Throwable t) {
         debug(message,t);
@@ -867,7 +864,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public void debugAsync(@NotNull final String message, @NotNull final Throwable t) {
         executor.submit(() -> debug(message,t));
@@ -877,7 +874,7 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
      * @param t Throwable to log.
      * @apiNote Events are still triggered even if the message is not logged due to the current log level.
-     * @see     Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see     Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public void debug(@NotNull final Throwable t) {
         process(DEBUG,t);
@@ -888,7 +885,7 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
      * @param t Throwable to log.
      * @apiNote Events are still triggered even if the message is not logged due to the current log level.
-     * @see     Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see     Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public synchronized void debugSynchronized(@NotNull final Throwable t) {
         debug(t);
@@ -899,21 +896,19 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#DEBUG DEBUG} level consisting of the specified message, along with all the specified arguments.
      * @param t Throwable to log.
      * @apiNote Events are still triggered even if the message is not logged due to the current log level.
-     * @see     Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see     Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public void debugAsync(@NotNull final Throwable t) {
         executor.submit(() -> debug(t));
     }
 
     /**
-     * Checks if logs at {@link Level#DEBUG DEBUG} level, with the specified Marker, are logged or ignored.
-     * <p>
-     *     No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
-     *     The expected format of placeholders;
+     * Checks if logs at {@link Level#DEBUG DEBUG} level, with the specified Marker, are logged or ignored.<br>
+     * No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
+     * The expected format of placeholders;
      *      <pre>
      *          {@code logger.debug("Example {}.", Object);}
      *      </pre>
-     * </p>
      * @return True | False
      */
     @Override @Contract(pure = true)
@@ -926,7 +921,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param marker  The Marker to attach.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     @Override
     public void debug(@Nullable final Marker marker, @NotNull final String message) {
@@ -939,7 +934,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param marker  The Marker to attach.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public synchronized void debugSynchronized(@Nullable final Marker marker, @NotNull final String message) {
         debug(marker,message);
@@ -951,7 +946,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param marker  The Marker to attach.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public void debugAsync(@Nullable final Marker marker, @NotNull final String message) {
         executor.submit(() -> debug(marker,message));
@@ -963,7 +958,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     @Override
     public void debug(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
@@ -977,7 +972,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public synchronized void debugSynchronized(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
         debug(marker,message,arg);
@@ -990,7 +985,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public void debugAsync(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
         executor.submit(() -> debug(marker,message,arg));
@@ -1003,7 +998,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     @Override
     public void debug(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
@@ -1018,7 +1013,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public synchronized void debugSynchronized(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
         debug(marker,message,arg1,arg2);
@@ -1032,7 +1027,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public void debugAsync(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
         executor.submit(() -> debug(marker,message,arg1,arg2));
@@ -1044,7 +1039,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     @Override
     public void debug(@NotNull final Marker marker, @NotNull final String message, Object... args) {
@@ -1058,7 +1053,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public synchronized void debugSynchronized(@NotNull final Marker marker, @NotNull final String message, Object... args) {
         debug(marker,message,args);
@@ -1071,7 +1066,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public void debugAsync(@NotNull final Marker marker, @NotNull final String message, Object... args) {
         executor.submit(() -> debug(marker,message,args));
@@ -1083,7 +1078,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     @Override
     public void debug(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
@@ -1097,7 +1092,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public synchronized void debugSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
         debug(marker,message,t);
@@ -1110,7 +1105,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see           Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public void debugAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
         executor.submit(() -> debug(marker,message,t));
@@ -1121,7 +1116,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param t      Throwable to log.
      * @param marker The Marker to attach.
      * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
-     * @see          Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see          Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public void debug(@NotNull final Marker marker, @NotNull final Throwable t) {
         process(DEBUG,marker,t);
@@ -1133,7 +1128,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param t      Throwable to log.
      * @param marker The Marker to attach.
      * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
-     * @see          Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see          Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public synchronized void debugSynchronized(@NotNull final Marker marker, @NotNull final Throwable t) {
         debug(marker,t);
@@ -1145,21 +1140,19 @@ public final class Logger implements org.slf4j.Logger {
      * @param t      Throwable to log.
      * @param marker The Marker to attach.
      * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
-     * @see          Logger#isDebugEnabled()Logger#isDebugEnabled
+     * @see          Logger#isDebugEnabled() Logger#isDebugEnabled
      */
     public void debugAsync(@NotNull final Marker marker, @NotNull final Throwable t) {
         executor.submit(() -> debug(marker,t));
     }
 
     /**
-     * Checks if logs at {@link Level#INFO INFO} level are logged or ignored.
-     * <p>
-     *     No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
-     *     The expected format of placeholders;
+     * Checks if logs at {@link Level#INFO INFO} level are logged or ignored.<br>
+     * No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
+     * The expected format of placeholders;
      *      <pre>
      *          {@code logger.info("Example {}.", Object);}
      *      </pre>
-     * </p>
      * @return True | False
      */
     @Override @Contract(pure = true)
@@ -1171,7 +1164,7 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
      * @param message The String log.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     @Override
     public void info(@NotNull final String message) {
@@ -1183,7 +1176,7 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
      * @param message The String log.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public synchronized void infoSynchronized(@NotNull final String message) {
         info(message);
@@ -1194,7 +1187,7 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
      * @param message The String log.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public void infoAsync(@NotNull final String message) {
         executor.submit(() -> info(message));
@@ -1205,7 +1198,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String to log.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     @Override
     public void info(@NotNull final String message, final Object arg) {
@@ -1218,7 +1211,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public synchronized void infoSynchronized(@NotNull final String message, final Object arg) {
         info(message,arg);
@@ -1230,7 +1223,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public void infoAsync(@NotNull final String message, final Object arg) {
         executor.submit(() -> info(message,arg));
@@ -1242,7 +1235,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     @Override
     public void info(@NotNull final String message, final Object arg1, final Object arg2) {
@@ -1256,7 +1249,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public synchronized void infoSynchronized(@NotNull final String message, final Object arg1, final Object arg2) {
         info(message,arg1,arg2);
@@ -1269,7 +1262,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public void infoAsync(@NotNull final String message, final Object arg1, final Object arg2) {
         executor.submit(() -> info(message,arg1,arg2));
@@ -1280,7 +1273,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String to log.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     @Override
     public void info(@NotNull final String message, Object... args) {
@@ -1293,7 +1286,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public synchronized void infoSynchronized(@NotNull final String message, Object... args) {
         info(message,args);
@@ -1305,7 +1298,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public void infoAsync(@NotNull final String message, Object... args) {
         executor.submit(() -> info(message,args));
@@ -1316,7 +1309,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String to log.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     @Override
     public void info(@NotNull final String message, @NotNull final Throwable t) {
@@ -1329,7 +1322,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public synchronized void infoSynchronized(@NotNull final String message, @NotNull final Throwable t) {
         info(message,t);
@@ -1341,7 +1334,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public void infoAsync(@NotNull final String message, @NotNull final Throwable t) {
         executor.submit(() -> info(message,t));
@@ -1351,7 +1344,7 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
      * @param t Throwable to log.
      * @apiNote Events are still triggered even if the message is not logged due to the current log level.
-     * @see     Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see     Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public void info(@NotNull final Throwable t) {
         process(INFO,t);
@@ -1362,7 +1355,7 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
      * @param t Throwable to log.
      * @apiNote Events are still triggered even if the message is not logged due to the current log level.
-     * @see     Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see     Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public synchronized void infoSynchronized(@NotNull final Throwable t) {
         info(t);
@@ -1373,21 +1366,19 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#INFO INFO} level consisting of the specified message, along with all the specified arguments.
      * @param t Throwable to log.
      * @apiNote Events are still triggered even if the message is not logged due to the current log level.
-     * @see     Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see     Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public void infoAsync(@NotNull final Throwable t) {
         executor.submit(() -> info(t));
     }
 
     /**
-     * Checks if logs at {@link Level#INFO INFO} level, with the specified Marker, are logged or ignored.
-     * <p>
+     * Checks if logs at {@link Level#INFO INFO} level, with the specified Marker, are logged or ignored.<br>
      *     No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
      *     The expected format of placeholders;
      *      <pre>
      *          {@code logger.info("Example {}.", Object);}
      *      </pre>
-     * </p>
      * @return True | False
      */
     @Override @Contract(pure = true)
@@ -1400,7 +1391,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param marker  The Marker to attach.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     @Override
     public void info(@Nullable final Marker marker, @NotNull final String message) {
@@ -1413,7 +1404,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param marker  The Marker to attach.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public synchronized void infoSynchronized(@Nullable final Marker marker, @NotNull final String message) {
         info(marker,message);
@@ -1425,7 +1416,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param marker  The Marker to attach.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public void infoAsync(@Nullable final Marker marker, @NotNull final String message) {
         executor.submit(() -> info(marker,message));
@@ -1437,7 +1428,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     @Override
     public void info(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
@@ -1451,7 +1442,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public synchronized void infoSynchronized(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
         info(marker,message,arg);
@@ -1464,7 +1455,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public void infoAsync(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
         executor.submit(() -> info(marker,message,arg));
@@ -1477,7 +1468,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     @Override
     public void info(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
@@ -1492,7 +1483,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public synchronized void infoSynchronized(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
         info(marker,message,arg1,arg2);
@@ -1506,7 +1497,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public void infoAsync(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
         executor.submit(() -> info(marker,message,arg1,arg2));
@@ -1518,7 +1509,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     @Override
     public void info(@NotNull final Marker marker, @NotNull final String message, Object... args) {
@@ -1532,7 +1523,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public synchronized void infoSynchronized(@NotNull final Marker marker, @NotNull final String message, Object... args) {
         info(marker,message,args);
@@ -1545,7 +1536,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public void infoAsync(@NotNull final Marker marker, @NotNull final String message, Object... args) {
         executor.submit(() -> info(marker,message,args));
@@ -1557,7 +1548,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     @Override
     public void info(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
@@ -1571,7 +1562,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public synchronized void infoSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
         info(marker,message,t);
@@ -1584,7 +1575,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see           Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public void infoAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
         executor.submit(() -> info(marker,message,t));
@@ -1595,7 +1586,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param t      Throwable to log.
      * @param marker The Marker to attach.
      * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
-     * @see          Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see          Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public void info(@NotNull final Marker marker, @NotNull final Throwable t) {
         process(INFO,marker,t);
@@ -1607,7 +1598,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param t      Throwable to log.
      * @param marker The Marker to attach.
      * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
-     * @see          Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see          Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public synchronized void infoSynchronized(@NotNull final Marker marker, @NotNull final Throwable t) {
         info(marker,t);
@@ -1619,21 +1610,19 @@ public final class Logger implements org.slf4j.Logger {
      * @param t      Throwable to log.
      * @param marker The Marker to attach.
      * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
-     * @see          Logger#isInfoEnabled()Logger#isInfoEnabled
+     * @see          Logger#isInfoEnabled() Logger#isInfoEnabled
      */
     public void infoAsync(@NotNull final Marker marker, @NotNull final Throwable t) {
         executor.submit(() -> info(marker,t));
     }
 
     /**
-     * Checks if logs at {@link Level#WARNING WARNING} level are logged or ignored.
-     * <p>
+     * Checks if logs at {@link Level#WARNING WARNING} level are logged or ignored.<br>
      *     No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
      *     The expected format of placeholders;
      *      <pre>
      *          {@code logger.warn("Example {}.", Object);}
      *      </pre>
-     * </p>
      * @return True | False
      */
     @Override @Contract(pure = true)
@@ -1642,10 +1631,24 @@ public final class Logger implements org.slf4j.Logger {
     }
 
     /**
+     * Checks if logs at {@link Level#WARNING WARNING} level are logged or ignored.<br>
+     *     No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
+     *     The expected format of placeholders;
+     *      <pre>
+     *          {@code logger.warn("Example {}.", Object);}
+     *      </pre>
+     * @return True | False
+     */
+    @Contract(pure = true)
+    public boolean isWarningEnabled() {
+        return isLoggable(Level.WARNING);
+    }
+
+    /**
      * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
      * @param message The String log.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     @Override
     public void warn(@NotNull final String message) {
@@ -1653,13 +1656,34 @@ public final class Logger implements org.slf4j.Logger {
     }
 
     /**
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warning(@NotNull final String message) {
+        warn(message);
+    }
+
+    /**
      * <strong>This operation is <i>synchronous.</i></strong><hr>
      * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
      * @param message The String log.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public synchronized void warnSynchronized(@NotNull final String message) {
+        warn(message);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public synchronized void warningSynchronized(@NotNull final String message) {
         warn(message);
     }
 
@@ -1668,9 +1692,20 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
      * @param message The String log.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public void warnAsync(@NotNull final String message) {
+        executor.submit(() -> warn(message));
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warningAsync(@NotNull final String message) {
         executor.submit(() -> warn(message));
     }
 
@@ -1679,11 +1714,22 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String to log.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     @Override
     public void warn(@NotNull final String message, final Object arg) {
         process(WARNING,message,arg);
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warning(@NotNull final String message, final Object arg) {
+        warn(message,arg);
     }
 
     /**
@@ -1692,9 +1738,21 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public synchronized void warnSynchronized(@NotNull final String message, final Object arg) {
+        warn(message,arg);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public synchronized void warningSynchronized(@NotNull final String message, final Object arg) {
         warn(message,arg);
     }
 
@@ -1704,9 +1762,21 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public void warnAsync(@NotNull final String message, final Object arg) {
+        executor.submit(() -> warn(message,arg));
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warningAsync(@NotNull final String message, final Object arg) {
         executor.submit(() -> warn(message,arg));
     }
 
@@ -1716,11 +1786,23 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     @Override
     public void warn(@NotNull final String message, final Object arg1, final Object arg2) {
         process(WARNING,message,arg1,arg2);
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warning(@NotNull final String message, final Object arg1, final Object arg2) {
+        warn(message,arg1,arg2);
     }
 
     /**
@@ -1730,9 +1812,22 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public synchronized void warnSynchronized(@NotNull final String message, final Object arg1, final Object arg2) {
+        warn(message,arg1,arg2);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public synchronized void warningSynchronized(@NotNull final String message, final Object arg1, final Object arg2) {
         warn(message,arg1,arg2);
     }
 
@@ -1743,9 +1838,22 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public void warnAsync(@NotNull final String message, final Object arg1, final Object arg2) {
+        executor.submit(() -> warn(message,arg1,arg2));
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warningAsync(@NotNull final String message, final Object arg1, final Object arg2) {
         executor.submit(() -> warn(message,arg1,arg2));
     }
 
@@ -1754,11 +1862,22 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String to log.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     @Override
     public void warn(@NotNull final String message, Object... args) {
         process(WARNING,message,args);
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warning(@NotNull final String message, Object... args) {
+        warn(message,args);
     }
 
     /**
@@ -1767,9 +1886,21 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public synchronized void warnSynchronized(@NotNull final String message, Object... args) {
+        warn(message,args);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public synchronized void warningSynchronized(@NotNull final String message, Object... args) {
         warn(message,args);
     }
 
@@ -1779,9 +1910,21 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public void warnAsync(@NotNull final String message, Object... args) {
+        executor.submit(() -> warn(message,args));
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warningAsync(@NotNull final String message, Object... args) {
         executor.submit(() -> warn(message,args));
     }
 
@@ -1790,11 +1933,22 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String to log.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     @Override
     public void warn(@NotNull final String message, @NotNull final Throwable t) {
         process(WARNING,message,t);
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String to log.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warning(@NotNull final String message, @NotNull final Throwable t) {
+        warn(message,t);
     }
 
     /**
@@ -1803,9 +1957,21 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public synchronized void warnSynchronized(@NotNull final String message, @NotNull final Throwable t) {
+        warn(message,t);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public synchronized void warningSynchronized(@NotNull final String message, @NotNull final Throwable t) {
         warn(message,t);
     }
 
@@ -1815,9 +1981,21 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public void warnAsync(@NotNull final String message, @NotNull final Throwable t) {
+        executor.submit(() -> warn(message,t));
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warningAsync(@NotNull final String message, @NotNull final Throwable t) {
         executor.submit(() -> warn(message,t));
     }
 
@@ -1825,10 +2003,20 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
      * @param t Throwable to log.
      * @apiNote Events are still triggered even if the message is not logged due to the current log level.
-     * @see     Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see     Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public void warn(@NotNull final Throwable t) {
         process(WARNING,t);
+    }
+
+    /**
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param t Throwable to log.
+     * @apiNote Events are still triggered even if the message is not logged due to the current log level.
+     * @see     Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warning(@NotNull final Throwable t) {
+        warn(t);
     }
 
     /**
@@ -1836,9 +2024,20 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
      * @param t Throwable to log.
      * @apiNote Events are still triggered even if the message is not logged due to the current log level.
-     * @see     Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see     Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public synchronized void warnSynchronized(@NotNull final Throwable t) {
+        warn(t);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param t Throwable to log.
+     * @apiNote Events are still triggered even if the message is not logged due to the current log level.
+     * @see     Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public synchronized void warningSynchronized(@NotNull final Throwable t) {
         warn(t);
     }
 
@@ -1847,21 +2046,30 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
      * @param t Throwable to log.
      * @apiNote Events are still triggered even if the message is not logged due to the current log level.
-     * @see     Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see     Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public void warnAsync(@NotNull final Throwable t) {
         executor.submit(() -> warn(t));
     }
 
     /**
-     * Checks if logs at {@link Level#WARNING WARNING} level, with the specified Marker, are logged or ignored.
-     * <p>
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param t Throwable to log.
+     * @apiNote Events are still triggered even if the message is not logged due to the current log level.
+     * @see     Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warningAsync(@NotNull final Throwable t) {
+        executor.submit(() -> warn(t));
+    }
+
+    /**
+     * Checks if logs at {@link Level#WARNING WARNING} level, with the specified Marker, are logged or ignored.<br>
      *     No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
      *     The expected format of placeholders;
      *      <pre>
      *          {@code logger.warn("Example {}.", Object);}
      *      </pre>
-     * </p>
      * @return True | False
      */
     @Override @Contract(pure = true)
@@ -1870,15 +2078,40 @@ public final class Logger implements org.slf4j.Logger {
     }
 
     /**
+     * Checks if logs at {@link Level#WARNING WARNING} level, with the specified Marker, are logged or ignored.<br>
+     *     No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
+     *     The expected format of placeholders;
+     *      <pre>
+     *          {@code logger.warn("Example {}.", Object);}
+     *      </pre>
+     * @return True | False
+     */
+    @Contract(pure = true)
+    public boolean isWarningEnabled(@NotNull final Marker marker) {
+        return isLoggable(Level.WARNING, marker);
+    }
+
+    /**
      * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
      * @param message The String log.
      * @param marker  The Marker to attach.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     @Override
     public void warn(@Nullable final Marker marker, @NotNull final String message) {
         process(WARNING,marker,message);
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warning(@Nullable final Marker marker, @NotNull final String message) {
+        warn(marker,message);
     }
 
     /**
@@ -1887,9 +2120,21 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param marker  The Marker to attach.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public synchronized void warnSynchronized(@Nullable final Marker marker, @NotNull final String message) {
+        warn(marker,message);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public synchronized void warningSynchronized(@Nullable final Marker marker, @NotNull final String message) {
         warn(marker,message);
     }
 
@@ -1899,9 +2144,21 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param marker  The Marker to attach.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public void warnAsync(@Nullable final Marker marker, @NotNull final String message) {
+        executor.submit(() -> warn(marker,message));
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warningAsync(@Nullable final Marker marker, @NotNull final String message) {
         executor.submit(() -> warn(marker,message));
     }
 
@@ -1911,11 +2168,23 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     @Override
     public void warn(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
         process(WARNING,marker,message,arg);
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warning(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
+        warn(marker,message,arg);
     }
 
     /**
@@ -1925,7 +2194,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public synchronized void warnSynchronized(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
         warn(marker,message,arg);
@@ -1938,9 +2207,35 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public synchronized void warningSynchronized(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
+        warn(marker,message,arg);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public void warnAsync(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
+        executor.submit(() -> warn(marker,message,arg));
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg     Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warningAsync(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
         executor.submit(() -> warn(marker,message,arg));
     }
 
@@ -1951,11 +2246,24 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     @Override
     public void warn(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
         process(WARNING,marker,message,arg1,arg2);
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warning(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
+        warn(marker,message,arg1,arg2);
     }
 
     /**
@@ -1966,9 +2274,23 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public synchronized void warnSynchronized(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
+        warn(marker,message,arg1,arg2);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public synchronized void warningSynchronized(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
         warn(marker,message,arg1,arg2);
     }
 
@@ -1980,9 +2302,23 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public void warnAsync(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
+        executor.submit(() -> warn(marker,message,arg1,arg2));
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param arg1    Placeholder argument.
+     * @param arg2    Placeholder argument.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warningAsync(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
         executor.submit(() -> warn(marker,message,arg1,arg2));
     }
 
@@ -1992,11 +2328,23 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     @Override
     public void warn(@NotNull final Marker marker, @NotNull final String message, Object... args) {
         process(WARNING,marker,message,args);
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warning(@NotNull final Marker marker, @NotNull final String message, Object... args) {
+        warn(marker,message,args);
     }
 
     /**
@@ -2006,9 +2354,22 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public synchronized void warnSynchronized(@NotNull final Marker marker, @NotNull final String message, Object... args) {
+        warn(marker,message,args);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public synchronized void warningSynchronized(@NotNull final Marker marker, @NotNull final String message, Object... args) {
         warn(marker,message,args);
     }
 
@@ -2019,9 +2380,22 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public void warnAsync(@NotNull final Marker marker, @NotNull final String message, Object... args) {
+        executor.submit(() -> warn(marker,message,args));
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param args    Placeholder arguments.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warningAsync(@NotNull final Marker marker, @NotNull final String message, Object... args) {
         executor.submit(() -> warn(marker,message,args));
     }
 
@@ -2031,11 +2405,23 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     @Override
     public void warn(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
         process(WARNING,marker,t,message);
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warning(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
+        warn(marker,message,t);
     }
 
     /**
@@ -2045,9 +2431,22 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public synchronized void warnSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
+        warn(marker,message,t);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public synchronized void warningSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
         warn(marker,message,t);
     }
 
@@ -2058,9 +2457,22 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public void warnAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
+        executor.submit(() -> warn(marker,message,t));
+    }
+
+    /**
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param message The String log.
+     * @param marker  The Marker to attach.
+     * @param t       Throwable.
+     * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
+     * @see           Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warningAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
         executor.submit(() -> warn(marker,message,t));
     }
 
@@ -2069,10 +2481,21 @@ public final class Logger implements org.slf4j.Logger {
      * @param t      Throwable to log.
      * @param marker The Marker to attach.
      * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
-     * @see          Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see          Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public void warn(@NotNull final Marker marker, @NotNull final Throwable t) {
         process(WARNING,marker,t);
+    }
+
+    /**
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param t      Throwable to log.
+     * @param marker The Marker to attach.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     * @see          Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warning(@NotNull final Marker marker, @NotNull final Throwable t) {
+        warn(marker,t);
     }
 
     /**
@@ -2081,9 +2504,21 @@ public final class Logger implements org.slf4j.Logger {
      * @param t      Throwable to log.
      * @param marker The Marker to attach.
      * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
-     * @see          Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see          Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public synchronized void warnSynchronized(@NotNull final Marker marker, @NotNull final Throwable t) {
+        warn(marker,t);
+    }
+
+    /**
+     * <strong>This operation is <i>synchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param t      Throwable to log.
+     * @param marker The Marker to attach.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     * @see          Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public synchronized void warningSynchronized(@NotNull final Marker marker, @NotNull final Throwable t) {
         warn(marker,t);
     }
 
@@ -2093,21 +2528,31 @@ public final class Logger implements org.slf4j.Logger {
      * @param t      Throwable to log.
      * @param marker The Marker to attach.
      * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
-     * @see          Logger#isWarnEnabled()Logger#isWarnEnabled
+     * @see          Logger#isWarnEnabled() Logger#isWarnEnabled
      */
     public void warnAsync(@NotNull final Marker marker, @NotNull final Throwable t) {
         executor.submit(() -> warn(marker,t));
     }
 
     /**
-     * Checks if logs at {@link Level#ERROR ERROR} level are logged or ignored.
-     * <p>
+     * <strong>This operation is <i>asynchronous.</i></strong><hr>
+     * Logs a formatted message, with the specified Marker, at {@link Level#WARNING WARNING} level consisting of the specified message, along with all the specified arguments.
+     * @param t      Throwable to log.
+     * @param marker The Marker to attach.
+     * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
+     * @see          Logger#isWarnEnabled() Logger#isWarnEnabled
+     */
+    public void warningAsync(@NotNull final Marker marker, @NotNull final Throwable t) {
+        executor.submit(() -> warn(marker,t));
+    }
+
+    /**
+     * Checks if logs at {@link Level#ERROR ERROR} level are logged or ignored.<br>
      *     No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
      *     The expected format of placeholders;
      *      <pre>
      *          {@code logger.error("Example {}.", Object);}
      *      </pre>
-     * </p>
      * @return True | False
      */
     @Override @Contract(pure = true)
@@ -2119,7 +2564,7 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
      * @param message The String log.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     @Override
     public void error(@NotNull final String message) {
@@ -2131,7 +2576,7 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
      * @param message The String log.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public synchronized void errorSynchronized(@NotNull final String message) {
         error(message);
@@ -2142,7 +2587,7 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
      * @param message The String log.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public void errorAsync(@NotNull final String message) {
         executor.submit(() -> error(message));
@@ -2153,7 +2598,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String to log.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     @Override
     public void error(@NotNull final String message, final Object arg) {
@@ -2166,7 +2611,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public synchronized void errorSynchronized(@NotNull final String message, final Object arg) {
         error(message,arg);
@@ -2178,7 +2623,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public void errorAsync(@NotNull final String message, final Object arg) {
         executor.submit(() -> error(message,arg));
@@ -2190,7 +2635,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     @Override
     public void error(@NotNull final String message, final Object arg1, final Object arg2) {
@@ -2204,7 +2649,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public synchronized void errorSynchronized(@NotNull final String message, final Object arg1, final Object arg2) {
         error(message,arg1,arg2);
@@ -2217,7 +2662,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public void errorAsync(@NotNull final String message, final Object arg1, final Object arg2) {
         executor.submit(() -> error(message,arg1,arg2));
@@ -2228,7 +2673,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String to log.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     @Override
     public void error(@NotNull final String message, Object... args) {
@@ -2241,7 +2686,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public synchronized void errorSynchronized(@NotNull final String message, Object... args) {
         error(message,args);
@@ -2253,7 +2698,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public void errorAsync(@NotNull final String message, Object... args) {
         executor.submit(() -> error(message,args));
@@ -2264,7 +2709,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String to log.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     @Override
     public void error(@NotNull final String message, @NotNull final Throwable t) {
@@ -2277,7 +2722,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public synchronized void errorSynchronized(@NotNull final String message, @NotNull final Throwable t) {
         error(message,t);
@@ -2289,7 +2734,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public void errorAsync(@NotNull final String message, @NotNull final Throwable t) {
         executor.submit(() -> error(message,t));
@@ -2299,7 +2744,7 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
      * @param t Throwable to log.
      * @apiNote Events are still triggered even if the message is not logged due to the current log level.
-     * @see     Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see     Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public void error(@NotNull final Throwable t) {
         process(ERROR,t);
@@ -2310,7 +2755,7 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
      * @param t Throwable to log.
      * @apiNote Events are still triggered even if the message is not logged due to the current log level.
-     * @see     Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see     Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public synchronized void errorSynchronized(@NotNull final Throwable t) {
         error(t);
@@ -2321,21 +2766,19 @@ public final class Logger implements org.slf4j.Logger {
      * Logs a formatted message at {@link Level#ERROR ERROR} level consisting of the specified message, along with all the specified arguments.
      * @param t Throwable to log.
      * @apiNote Events are still triggered even if the message is not logged due to the current log level.
-     * @see     Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see     Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public void errorAsync(@NotNull final Throwable t) {
         executor.submit(() -> error(t));
     }
 
     /**
-     * Checks if logs at {@link Level#ERROR ERROR} level, with the specified Marker, are logged or ignored.
-     * <p>
-     *     No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
-     *     The expected format of placeholders;
+     * Checks if logs at {@link Level#ERROR ERROR} level, with the specified Marker, are logged or ignored.<br>
+     * No exceptions will be thrown if the format is not followed; the arguments will simply not be added to the log.
+     * The expected format of placeholders;
      *      <pre>
      *          {@code logger.error("Example {}.", Object);}
      *      </pre>
-     * </p>
      * @return True | False
      */
     @Override @Contract(pure = true)
@@ -2348,7 +2791,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param marker  The Marker to attach.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     @Override
     public void error(@Nullable final Marker marker, @NotNull final String message) {
@@ -2361,7 +2804,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param marker  The Marker to attach.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public synchronized void errorSynchronized(@Nullable final Marker marker, @NotNull final String message) {
         error(marker,message);
@@ -2373,7 +2816,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param message The String log.
      * @param marker  The Marker to attach.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public void errorAsync(@Nullable final Marker marker, @NotNull final String message) {
         executor.submit(() -> error(marker,message));
@@ -2385,7 +2828,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     @Override
     public void error(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
@@ -2399,7 +2842,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public synchronized void errorSynchronized(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
         error(marker,message,arg);
@@ -2412,7 +2855,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param arg     Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public void errorAsync(@NotNull final Marker marker, @NotNull final String message, final Object arg) {
         executor.submit(() -> error(marker,message,arg));
@@ -2425,7 +2868,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     @Override
     public void error(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
@@ -2440,7 +2883,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public synchronized void errorSynchronized(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
         error(marker,message,arg1,arg2);
@@ -2454,7 +2897,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param arg1    Placeholder argument.
      * @param arg2    Placeholder argument.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public void errorAsync(@NotNull final Marker marker, @NotNull final String message, final Object arg1, final Object arg2) {
         executor.submit(() -> error(marker,message,arg1,arg2));
@@ -2466,7 +2909,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     @Override
     public void error(@NotNull final Marker marker, @NotNull final String message, Object... args) {
@@ -2480,7 +2923,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public synchronized void errorSynchronized(@NotNull final Marker marker, @NotNull final String message, Object... args) {
         error(marker,message,args);
@@ -2493,7 +2936,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param args    Placeholder arguments.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public void errorAsync(@NotNull final Marker marker, @NotNull final String message, Object... args) {
         executor.submit(() -> error(marker,message,args));
@@ -2505,7 +2948,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     @Override
     public void error(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
@@ -2519,7 +2962,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public synchronized void errorSynchronized(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
         error(marker,message,t);
@@ -2532,7 +2975,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param marker  The Marker to attach.
      * @param t       Throwable.
      * @apiNote       Events are still triggered even if the message is not logged due to the current log level.
-     * @see           Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see           Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public void errorAsync(@NotNull final Marker marker, @NotNull final String message, @NotNull final Throwable t) {
         executor.submit(() -> error(marker,message,t));
@@ -2543,7 +2986,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param t      Throwable to log.
      * @param marker The Marker to attach.
      * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
-     * @see          Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see          Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public void error(@NotNull final Marker marker, @NotNull final Throwable t) {
         process(ERROR,marker,t);
@@ -2555,7 +2998,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param t      Throwable to log.
      * @param marker The Marker to attach.
      * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
-     * @see          Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see          Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public synchronized void errorSynchronized(@NotNull final Marker marker, @NotNull final Throwable t) {
         error(marker,t);
@@ -2567,7 +3010,7 @@ public final class Logger implements org.slf4j.Logger {
      * @param t      Throwable to log.
      * @param marker The Marker to attach.
      * @apiNote      Events are still triggered even if the message is not logged due to the current log level.
-     * @see          Logger#isErrorEnabled()Logger#isErrorEnabled
+     * @see          Logger#isErrorEnabled() Logger#isErrorEnabled
      */
     public void errorAsync(@NotNull final Marker marker, @NotNull final Throwable t) {
         executor.submit(() -> error(marker,t));

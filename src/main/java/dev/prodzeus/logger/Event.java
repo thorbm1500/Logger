@@ -10,11 +10,13 @@ import java.time.Instant;
 import java.util.Collection;
 
 /**
- * An Event is a "container" type Object created everytime a new log is logged.
- * Each Event contains all the relevant information of the log that triggered it,
- * and provides a way of retrieving and manipulating the data.
- * @apiNote By the time an Event is accessible, it has <i>already been fired</i>,
- * and no changes to the Event will be reflected in the original log.
+ * <p>
+ *     An Event is a "container" type Object created everytime a new log is logged.
+ *     Each Event contains all the relevant information of the log that triggered it,
+ *     and provides a way of retrieving and manipulating the data.
+ * </p>
+ * <b>Note: By the time an Event is accessible, it has <i>already been fired</i>,
+ * and no changes to the Event will be reflected in the original log.</b>
  */
 public final class Event {
 
@@ -70,7 +72,7 @@ public final class Event {
     /**
      * Gets the message logged.
      * @return The message logged.
-     * @see Event#getRawMessage()Event#getRawMessage
+     * @see Event#getRawMessage() Event#getRawMessage
      * @apiNote This message is formatted to the ASCII format, for coloring the logs in terminals.
      *          Events also contain the messages in their "raw" form, with all formatting stripped.
      */
@@ -106,7 +108,7 @@ public final class Event {
     /**
      * Gets the collection of arguments passed to the log.
      * @return An immutable collection of the log's arguments.
-     * @see Event#hasArguments()Event#hasArguments
+     * @see Event#hasArguments() Event#hasArguments
      */
     @Contract(pure = true)
     public @NotNull Collection<Object> getArguments() {
@@ -131,7 +133,7 @@ public final class Event {
      * @return The Exception if one is present, otherwise null.
      * @apiNote Exceptions will <i>always</i> be present in the collection of arguments,
      *          regardless of how they were logged.
-     * @see Event#hasException()Event#hasException
+     * @see Event#hasException() Event#hasException
      */
     @Contract(pure = true)
     public @Nullable Throwable getException() {

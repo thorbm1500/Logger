@@ -8,7 +8,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The Logger Factory is responsible for handling all existing Loggers and for creating new Loggers.
- * @apiNote Factory operations are Thread safe.
+ * <hr><b>Factory operations are Thread safe.</b>
  */
 public final class LoggerFactory implements ILoggerFactory {
 

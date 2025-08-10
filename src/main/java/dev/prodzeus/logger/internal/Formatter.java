@@ -18,7 +18,7 @@ import static dev.prodzeus.logger.components.Level.OFF;
 import static dev.prodzeus.logger.components.Level.EXCEPTION;
 
 /**
- * @apiNote <b>For internal use only.</b>
+ * <b>For internal use only.</b>
  */
 public final class Formatter {
 

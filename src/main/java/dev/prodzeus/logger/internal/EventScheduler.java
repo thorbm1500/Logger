@@ -8,7 +8,7 @@ import java.util.Deque;
 import java.util.concurrent.*;
 
 /**
- * @apiNote <b>For internal use only.</b>
+ * <b>For internal use only.</b>
  */
 public final class EventScheduler {
 

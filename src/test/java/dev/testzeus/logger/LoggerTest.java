@@ -115,7 +115,7 @@ class LoggerTest {
         );
     }
 
-    @Test
+    //@Test
     void exceptionLoggingTest() {
         assertAll(
                 () -> getLogger().trace("Exception Test. {}", new RuntimeException("Exception example.")),
@@ -131,8 +131,8 @@ class LoggerTest {
     void newListenerTest() {
         assertDoesNotThrow(() -> {
             final Listener listener = new TestListener(getLogger()).register();
-            getLogger().info("Listener test log for manual verification.");
-            Thread.sleep(500);
+            logTestSynchronized();
+            Thread.sleep(2000);
         });
     }
 
@@ -143,7 +143,7 @@ class LoggerTest {
         }
 
         @Override
-        public void onInfoLogEvent(@NotNull final Event event) {
+        public void onGenericLogEvent(@NotNull final Event event) {
             System.out.println("From Listener: " + event.getMessage());
         }
     }

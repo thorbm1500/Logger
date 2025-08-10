@@ -1,15 +1,10 @@
 plugins {
-    id 'java'
+    id 'java-library'
     id 'maven-publish'
 }
 
-group = 'dev.zeus'
-version = '1.0.0'
-
-java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
-    modularity.inferModulePath.set(true)
-}
+group = 'dev.prodzeus'
+version = '1.0.1'
 
 repositories {
     mavenCentral()
@@ -23,6 +18,56 @@ dependencies {
     annotationProcessor 'org.projectlombok:lombok:1.18.38'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.0'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+java {
+    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+    modularity.inferModulePath.set(true)
+    withJavadocJar()
+    withSourcesJar()
+}
+
+tasks.withType(Javadoc).configureEach {
+    options.tags = [
+            'apiNote:a:API Note:',
+            'implSpec:a:Implementation Requirements:',
+            'implNote:a:Implementation Note:'
+    ]
+
+    if (JavaVersion.current().isJava9Compatible()) {
+        options.addBooleanOption('html5', true)
+        options.addStringOption('-release', '21')
+        options.addStringOption('Xdoclint:all,-missing', '-quiet')
+    }
+
+    source = sourceSets.main.allJava
+    classpath = configurations.compileClasspath
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            components.java
+        }
+    }
+    repositories {
+        maven {
+            name = "Snapshots"
+            url = uri("https://repo.prodzeus.dev/snapshots") //
+            credentials {
+                username = findProperty("reposiliteUser") ?: ""
+                password = findProperty("reposilitePassword") ?: ""
+            }
+        }
+        maven {
+            name = "Releases"
+            url = uri("https://repo.prodzeus.dev/releases")
+            credentials {
+                username = findProperty("reposiliteUser") ?: ""
+                password = findProperty("reposilitePassword") ?: ""
+            }
+        }
+    }
 }
 
 tasks.named('test') {

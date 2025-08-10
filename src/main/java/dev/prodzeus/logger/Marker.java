@@ -8,14 +8,16 @@ import java.util.*;
 /**
  * Markers are named objects used to enrich log statements.
  * The Markers in this implementation of SLF4J can be used in 2 different ways.
- * <ol>1. Add extra tags to logs for better readability.</ol>
- * <ol>2. Ensure certain logs are always logged, by registering the Markers as <i>Forced Markers</i>.</ol>
+ * <ol>
+ *     <li>Add extra tags to logs for better readability.</li>
+ *     <li>Ensure certain logs are always logged, by registering the Markers as <i>Forced Markers</i>.</li>
+ * </ol>
  * <p>
  *      Some implementations value the Markers' data; however, the data of a Marker is ignored entirely in this implementation.
  *      This implementation instead relies on the practice of registering <i>Forced Markers</i>, and otherwise only
  *      using Markers for readability and customizability of logs.
  * </p>
- * @see Logger#registerForcedMarker(org.slf4j.Marker)
+ * @see Logger#registerForcedMarker(org.slf4j.Marker) Logger#registerForcedMarker
  */
 public final class Marker implements org.slf4j.Marker {
 
